@@ -42,6 +42,20 @@ jobs:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
           CRAFT_FONTS_REQUIRED: "1"
         run: ./packaging/windows/package.ps1 -Arch x64
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Instalador personalizado (NiderTextSetup.exe)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist/release -Filter "wordcraft-*-portable.zip" | Select-Object -First 1
+          if (-not $zip) { throw "zip portátil não encontrado" }
+          Copy-Item $zip.FullName installer/NiderTextSetup/payload.zip
+          $v = ($zip.Name -replace '^wordcraft-', '' -replace '-windows-x64-portable\.zip$', '')
+          $v3 = ($v -split '-')[0]
+          dotnet publish installer/NiderTextSetup -c Release -p:Version=$v3 -o dist/setup
+          if ($LASTEXITCODE -ne 0) { throw "falha ao compilar o instalador" }
+          Copy-Item dist/setup/NiderTextSetup.exe "dist/release/nider-text-setup-$v-windows-x64.exe"
       - name: Renomear arquivos
         shell: pwsh
         run: |

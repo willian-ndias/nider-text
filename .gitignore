@@ -8,3 +8,6 @@ plan/
 /.claude/
 /target-*/
 /craft-fonts/
+installer/NiderTextSetup/payload.zip
+installer/NiderTextSetup/bin/
+installer/NiderTextSetup/obj/
