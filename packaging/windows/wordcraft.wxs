@@ -17,24 +17,24 @@
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
-      Name="WordCraft"
-      Manufacturer="Learning Machines LLC"
+      Name="Nider Text"
+      Manufacturer="Nider"
       Version="$(var.Version)"
-      UpgradeCode="075497F9-E861-45D0-9C7F-A74F8C34E6BA"
+      UpgradeCode="ECC6FE2E-930F-4B45-A83A-21ECD5FBC9B6"
       Scope="perMachine"
       Compressed="yes"
       Language="1033">
-    <SummaryInformation Description="WordCraft word processor" Manufacturer="Learning Machines LLC" />
+    <SummaryInformation Description="Nider Text, editor de texto e diagramação" Manufacturer="Nider" />
     <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
          (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
     <MajorUpgrade AllowSameVersionUpgrades="yes"
-        DowngradeErrorMessage="A newer version of WordCraft is already installed." />
+        DowngradeErrorMessage="Uma versão mais nova do Nider Text já está instalada." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Icon Id="WordcraftIcon.ico" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="WordcraftIcon.ico" />
-    <Property Id="ARPURLINFOABOUT" Value="https://getartcraft.com/apps/wordcraft" />
-    <Property Id="ARPURLUPDATEINFO" Value="https://getartcraft.com/apps/wordcraft" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/willian-ndias/nider-text" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/willian-ndias/nider-text" />
     <Property Id="ARPHELPLINK" Value="https://discord.gg/artcraft" />
 
     <!-- Installer UI (#198): WixUI_Minimal is welcome + license, progress, then a finish page so
@@ -43,7 +43,7 @@
          LICENSE-APACHE. The finish page offers to launch WordCraft (ticked by default) through
          WixShellExec (WixToolset.Util.wixext); silent installs (/qn) never show it. -->
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch WordCraft" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir o Nider Text" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WixShellExecTarget" Value="[#WordcraftExe]" />
     <CustomAction Id="LaunchWordcraft" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec"
@@ -55,21 +55,21 @@
     </UI>
 
     <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="INSTALLFOLDER" Name="WordCraft" />
+      <Directory Id="INSTALLFOLDER" Name="Nider Text" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
 
-    <Feature Id="Main" Title="WordCraft" Level="1">
+    <Feature Id="Main" Title="Nider Text" Level="1">
       <ComponentGroupRef Id="WordcraftFiles" />
     </Feature>
   </Package>
 
   <Fragment>
     <ComponentGroup Id="WordcraftFiles" Directory="INSTALLFOLDER">
-      <Component Id="WordcraftApp" Guid="855DCEC6-9285-444F-9382-9654B83B34F6">
+      <Component Id="WordcraftApp" Guid="7DDFF7C5-6BDF-48BF-8051-0DB468CEF420">
         <File Id="WordcraftExe" Source="$(var.BinDir)\wordcraft.exe" KeyPath="yes">
-          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="WordCraft"
-              Description="WordCraft word processor" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Nider Text"
+              Description="Nider Text, editor de texto e diagramação" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
               Icon="WordcraftIcon.ico" IconIndex="0" />
         </File>
 
@@ -83,12 +83,12 @@
            makes it the default (File › Options › General opens that page). Nothing here sets an
            extension's default: the installer never takes over .docx from another app. Markdown and
            plain text are only "Open with" candidates. Removed again on uninstall. -->
-      <Component Id="WordcraftFileTypes" Guid="EFF89E6A-F9B8-49F9-B3AE-E243347484B4">
+      <Component Id="WordcraftFileTypes" Guid="6B695464-0AB7-49EA-A02E-6E9869B2727A">
         <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="WordCraft" Value="Software\WordCraft\Capabilities" Type="string" KeyPath="yes" />
-        <RegistryValue Root="HKLM" Key="Software\WordCraft\Capabilities" Name="ApplicationName" Value="WordCraft" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\WordCraft\Capabilities" Name="ApplicationName" Value="Nider Text" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\WordCraft\Capabilities" Name="ApplicationDescription" Value="Write and design documents; open and save Word files." Type="string" />
         <RegistryValue Root="HKLM" Key="Software\WordCraft\Capabilities" Name="ApplicationIcon" Value="&quot;[#WordcraftExe]&quot;,0" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\wordcraft.exe" Name="FriendlyAppName" Value="WordCraft" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\wordcraft.exe" Name="FriendlyAppName" Value="Nider Text" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\wordcraft.exe\shell\open\command" Value="&quot;[#WordcraftExe]&quot; &quot;%1&quot;" Type="string" />
 
         <ProgId Id="WordCraft.Document" Description="Word Document" Icon="WordcraftExe" IconIndex="0" />

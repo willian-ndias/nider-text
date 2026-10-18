@@ -1,0 +1,65 @@
+name: Nider Text para Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+      WORDCRAFT_BUILD_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fontes do WordCraft (craft-fonts)
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          path: craft-fonts
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: nider-text-windows-x64
+      - name: Instalar WiX
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g "WixToolset.UI.wixext/5.0.2" "WixToolset.Util.wixext/5.0.2"
+      - name: Compilar e empacotar
+        shell: pwsh
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: "1"
+        run: ./packaging/windows/package.ps1 -Arch x64
+      - name: Renomear arquivos
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/release -File | Where-Object { $_.Name -like 'wordcraft-*' } | ForEach-Object {
+            Rename-Item $_.FullName ($_.Name -replace '^wordcraft-', 'nider-text-')
+          }
+          Get-ChildItem dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nider-text-windows-x64
+          path: dist/release/*
+          if-no-files-found: error
+      - name: Publicar versão no GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" dist/release/nider-text-* --title "Nider Text $tag" --prerelease \
+            --notes "Instalador do Nider Text para Windows (x64). Versão em teste. Se o Windows avisar que o aplicativo não é reconhecido, clique em Mais informações e depois em Executar assim mesmo."
