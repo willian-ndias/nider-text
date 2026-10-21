@@ -2204,6 +2204,14 @@ impl WordApp {
             return;
         }
         let t = theme::Tokens::get(&ctx);
+        theme::paint_backdrop(&ctx);
+        // Nider "Vidro": the page area is a rounded, darker glass card on the backdrop.
+        let work = egui::Frame::NONE
+            .fill(t.canvas)
+            .stroke(egui::Stroke::new(1.0, t.border))
+            .corner_radius(egui::CornerRadius::same(18))
+            .inner_margin(4)
+            .outer_margin(egui::Margin { left: 16, right: 16, top: 0, bottom: 4 });
         self.escape_free = self.dialog.is_none() && !self.ui.backstage && self.ui.keytips == keytips::Phase::Off && !egui::Popup::is_any_open(&ctx);
         // Keytips are read before layout so the frame paints the new state; badges paint after
         // the ribbon so they sit on top of it.
@@ -2225,7 +2233,7 @@ impl WordApp {
             chrome::title_bar(self, ui);
             ribbon::show(self, ui);
             chrome::status_bar(self, ui);
-            egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
+            egui::CentralPanel::default().frame(work).show(ui, |_| {});
         } else {
             chrome::title_bar(self, ui);
             if !self.session.view.focus_mode {
@@ -2233,7 +2241,7 @@ impl WordApp {
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
             }
-            egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {
+            egui::CentralPanel::default().frame(work).show(ui, |ui| {
                 canvas::show(self, ui);
             });
         }

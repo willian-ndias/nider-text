@@ -255,7 +255,7 @@ impl MacTitleBar {
 
 /// The title bar's height: taller on Windows, where it is the whole caption (the app draws it, so
 /// the brand and the document name read clearly; `window_controls`).
-pub const TITLE_BAR: f32 = if cfg!(target_os = "windows") { 42.0 } else { 38.0 };
+pub const TITLE_BAR: f32 = if cfg!(target_os = "windows") { 52.0 } else { 46.0 };
 
 /// The Nider Text app icon (assets/app-icon, rendered from wordcraft.svg).
 const BRAND_PNG: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/512x512/apps/ai.storyteller.wordcraft.png");
@@ -300,9 +300,9 @@ pub fn brand(ui: &mut Ui, size: f32, ink: egui::Color32, accent: egui::Color32) 
         ui.painter().image(tex.id(), snapped, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
     }
     ui.add_space(4.0);
-    let font = semibold(14.0);
-    ui.label(egui::RichText::new("NIDER ").font(font.clone()).color(ink).extra_letter_spacing(0.6));
-    ui.label(egui::RichText::new("TEXT").font(font).color(accent).extra_letter_spacing(0.6));
+    let font = semibold(16.0);
+    ui.label(egui::RichText::new("NIDER ").font(font.clone()).color(ink).extra_letter_spacing(1.2));
+    ui.label(egui::RichText::new("TEXT").font(font).color(accent).extra_letter_spacing(1.2));
 }
 
 pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
@@ -318,8 +318,8 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
     let controls = app.window_controls.clone().filter(|_| !fullscreen);
     egui::Panel::top("title_bar")
         .exact_size(if mac { bar.height } else { TITLE_BAR })
-        .frame(egui::Frame::NONE.fill(t.title_bar).inner_margin(egui::Margin {
-            left,
+        .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+            left: if mac { left } else { 16 },
             right: if controls.is_some() { 0 } else { 10 },
             top: 0,
             bottom: 0,
@@ -509,10 +509,7 @@ pub fn status_bar(app: &mut WordApp, ui: &mut Ui) {
     egui::Panel::bottom("status")
         .exact_size(26.0)
         .frame(
-            egui::Frame::NONE
-                .fill(t.status_bar)
-                .inner_margin(egui::Margin { left: 12, right: 12, top: 0, bottom: 0 })
-                .stroke(Stroke::new(1.0, t.border)),
+            egui::Frame::NONE.inner_margin(egui::Margin { left: 20, right: 20, top: 0, bottom: 0 }),
         )
         .show(ui, |ui| {
             // No document open (#1129): an empty status bar.

@@ -296,9 +296,18 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         }
     }
     // Tab strip.
+    // Nider "Vidro": the tab strip and the ribbon are one rounded glass card on the backdrop.
+    let ribbon_shown = !app.ui.ribbon_collapsed;
+    let bottom_corners = if ribbon_shown { 0 } else { 18 };
     egui::Panel::top("tabs")
-        .exact_size(30.0)
-        .frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 }))
+        .exact_size(40.0)
+        .frame(
+            egui::Frame::NONE
+                .fill(t.glass)
+                .corner_radius(egui::CornerRadius { nw: 18, ne: 18, sw: bottom_corners, se: bottom_corners })
+                .inner_margin(egui::Margin { left: 8, right: 10, top: 4, bottom: 0 })
+                .outer_margin(egui::Margin { left: 16, right: 16, top: 0, bottom: 0 }),
+        )
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
@@ -396,10 +405,19 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                             }
                             let active = app.ui.tab == tab && !app.ui.backstage;
                             resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, active, shown));
-                            if resp.hovered() && !active {
-                                ui.painter().rect_filled(r.shrink2(vec2(0.0, 4.0)), 4.0, t.hover);
+                            // Vidro: tabs are pills; the open one is filled silver.
+                            if active {
+                                ui.painter().rect_filled(r.shrink2(vec2(0.0, 1.0)), 15.0, t.pill);
+                            } else if resp.hovered() {
+                                ui.painter().rect_filled(r.shrink2(vec2(0.0, 1.0)), 15.0, t.hover);
                             }
-                            let color = if contextual || active { t.accent_text } else { t.text };
+                            let color = if active {
+                                t.pill_text
+                            } else if contextual {
+                                t.accent_text
+                            } else {
+                                t.text_dim
+                            };
                             if cut {
                                 let mut job = egui::text::LayoutJob::single_section(
                                     shown.to_string(),
@@ -423,10 +441,6 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                                 );
                             }
                             let resp = if cut { resp.on_hover_text(shown) } else { resp };
-                            if active {
-                                let u = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(w - 16.0, 3.0));
-                                ui.painter().rect_filled(u, 2.0, t.accent);
-                            }
                             if resp.clicked() {
                                 let _ = app.run("ui.tab", json!({"tab": tab}));
                             }
@@ -475,7 +489,11 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     egui::Panel::top("ribbon")
         .exact_size(CONTENT_H + LABEL_H + 10.0)
         .frame(
-            egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 }).stroke(Stroke::new(1.0, t.border)),
+            egui::Frame::NONE
+                .fill(t.glass)
+                .corner_radius(egui::CornerRadius { nw: 0, ne: 0, sw: 18, se: 18 })
+                .inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 6 })
+                .outer_margin(egui::Margin { left: 16, right: 16, top: 0, bottom: 8 }),
         )
         .show(ui, |ui| {
             // Right-click on the ribbon (outside a button): Customize Ribbon. Registered first, so

@@ -298,26 +298,35 @@ pub struct Tokens {
     pub close_hover: Color32,
     pub close_pressed: Color32,
     pub on_close: Color32,
+    /// Nider "Vidro": the window backdrop (a vertical gradient with the app's colour glowing at
+    /// the top left), the glass cards and their light edge, and the silver pill of the open tab.
+    pub backdrop_top: Color32,
+    pub backdrop_bottom: Color32,
+    pub glow: Color32,
+    pub glass: Color32,
+    pub glass_edge: Color32,
+    pub pill: Color32,
+    pub pill_text: Color32,
 }
 
 impl Tokens {
     pub fn light() -> Self {
         Tokens {
             dark: false,
-            title_bar: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            ribbon: Color32::from_rgb(0xF9, 0xF9, 0xF9),
-            tab_strip: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            canvas: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-            panel: Color32::from_rgb(0xFA, 0xFA, 0xFA),
-            border: Color32::from_rgb(0xE1, 0xE1, 0xE1),
-            border_strong: Color32::from_rgb(0xC8, 0xC8, 0xC8),
-            text: Color32::from_rgb(0x24, 0x24, 0x24),
-            text_dim: Color32::from_rgb(0x61, 0x61, 0x61),
+            title_bar: Color32::from_rgb(0xE4, 0xE8, 0xEC),
+            ribbon: Color32::from_rgb(0xF7, 0xF8, 0xFA),
+            tab_strip: Color32::from_rgb(0xF7, 0xF8, 0xFA),
+            canvas: Color32::from_rgb(0xDC, 0xE0, 0xE5),
+            panel: Color32::from_rgb(0xF6, 0xF7, 0xF9),
+            border: Color32::from_rgb(0xCD, 0xD3, 0xDA),
+            border_strong: Color32::from_rgb(0xB4, 0xBB, 0xC4),
+            text: Color32::from_rgb(0x1B, 0x1F, 0x27),
+            text_dim: Color32::from_rgb(0x4E, 0x55, 0x62),
             text_disabled: Color32::from_rgb(0xA8, 0xA8, 0xA8),
-            icon: Color32::from_rgb(0x42, 0x42, 0x42),
-            hover: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-            pressed: Color32::from_rgb(0xD6, 0xD6, 0xD6),
-            checked: Color32::from_rgb(0xDD, 0xE3, 0xF8),
+            icon: Color32::from_rgb(0x3A, 0x41, 0x4B),
+            hover: Color32::from_rgb(0xE6, 0xE9, 0xED),
+            pressed: Color32::from_rgb(0xD8, 0xDD, 0xE3),
+            checked: Color32::from_rgb(0xD3, 0xEE, 0xF4),
             accent: APP_COLOR,
             accent_text: APP_INK,
             on_accent: Color32::WHITE,
@@ -327,7 +336,7 @@ impl Tokens {
             ruler: Color32::from_rgb(0xFF, 0xFF, 0xFF),
             ruler_margin: Color32::from_rgb(0xD4, 0xD4, 0xD4),
             ruler_tick: Color32::from_rgb(0x70, 0x70, 0x70),
-            status_bar: Color32::from_rgb(0xF0, 0xF0, 0xF0),
+            status_bar: Color32::from_rgb(0xE4, 0xE8, 0xEC),
             selection: Color32::from_rgba_unmultiplied(0x3B, 0x5B, 0xDB, 0x48),
             find_highlight: Color32::from_rgba_unmultiplied(0xFF, 0xE0, 0x3D, 0x90),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x22),
@@ -337,8 +346,8 @@ impl Tokens {
             crop_handle: Color32::BLACK,
             crop_dim: Color32::from_rgba_unmultiplied(0x30, 0x30, 0x30, 0xE0),
             balloon: Color32::WHITE,
-            markup_area: Color32::from_rgb(0xF3, 0xF3, 0xF3),
-            markup_edge: Color32::from_rgb(0xE0, 0xE0, 0xE0),
+            markup_area: Color32::from_rgb(0xEE, 0xF0, 0xF3),
+            markup_edge: Color32::from_rgb(0xCD, 0xD3, 0xDA),
             resolved_text: Color32::from_rgb(0x1B, 0x6B, 0x42),
             author_colors: [
                 Color32::from_rgb(0x2F, 0x6F, 0xD0),
@@ -354,7 +363,7 @@ impl Tokens {
                 Color32::from_rgb(0x8E, 0x44, 0xAD),
                 Color32::from_rgb(0xE0, 0x7B, 0x1F),
             ],
-            menu: Color32::WHITE,
+            menu: Color32::from_rgb(0xFF, 0xFF, 0xFF),
             blue: Color32::from_rgb(0x2F, 0x6F, 0xD0),
             red: Color32::from_rgb(0xD1, 0x3B, 0x3B),
             green: Color32::from_rgb(0x2E, 0x8B, 0x57),
@@ -362,6 +371,13 @@ impl Tokens {
             close_hover: Color32::from_rgb(0xC4, 0x2B, 0x1C),
             close_pressed: Color32::from_rgb(0xA6, 0x23, 0x16),
             on_close: Color32::WHITE,
+            backdrop_top: Color32::from_rgb(0xF1, 0xF3, 0xF5),
+            backdrop_bottom: Color32::from_rgb(0xD9, 0xDE, 0xE4),
+            glow: Color32::from_rgb(0xD6, 0xEE, 0xF3),
+            glass: Color32::from_rgb(0xF7, 0xF8, 0xFA),
+            glass_edge: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            pill: Color32::from_rgb(0x1B, 0x1F, 0x27),
+            pill_text: Color32::from_rgb(0xF5, 0xF2, 0xEC),
         }
     }
     /// Nider Titânio (the Nider Terminal's chrome, NIDER_VISUAL §17): graphite surfaces, silver
@@ -369,34 +385,34 @@ impl Tokens {
     pub fn dark() -> Self {
         Tokens {
             dark: true,
-            title_bar: Color32::from_rgb(0x2B, 0x30, 0x38),
-            ribbon: Color32::from_rgb(0x26, 0x2B, 0x32),
-            tab_strip: Color32::from_rgb(0x2B, 0x30, 0x38),
-            canvas: Color32::from_rgb(0x17, 0x1B, 0x21),
-            panel: Color32::from_rgb(0x20, 0x24, 0x2A),
-            border: Color32::from_rgb(0x3A, 0x40, 0x48),
-            border_strong: Color32::from_rgb(0x4A, 0x51, 0x5A),
+            title_bar: Color32::from_rgb(0x0B, 0x0E, 0x13),
+            ribbon: Color32::from_rgb(0x16, 0x1A, 0x21),
+            tab_strip: Color32::from_rgb(0x16, 0x1A, 0x21),
+            canvas: Color32::from_rgb(0x0A, 0x0D, 0x11),
+            panel: Color32::from_rgb(0x13, 0x17, 0x1D),
+            border: Color32::from_rgb(0x26, 0x2B, 0x33),
+            border_strong: Color32::from_rgb(0x3A, 0x41, 0x4B),
             // Neutral greys for text and fields: equation pictures are tinted with them (#1002).
-            text: Color32::from_rgb(0xF2, 0xF4, 0xF6),
-            text_dim: Color32::from_rgb(0xAE, 0xB4, 0xBB),
+            text: Color32::from_rgb(0xF5, 0xF2, 0xEC),
+            text_dim: Color32::from_rgb(0xB8, 0xB4, 0xAE),
             text_disabled: Color32::from_rgb(0x7E, 0x85, 0x8D),
-            icon: Color32::from_rgb(0xD6, 0xDC, 0xE2),
-            hover: Color32::from_rgb(0x34, 0x3A, 0x43),
-            pressed: Color32::from_rgb(0x3E, 0x45, 0x4F),
-            checked: Color32::from_rgb(0x2C, 0x43, 0x52),
-            accent: Color32::from_rgb(0x46, 0xC3, 0xFF),
-            accent_text: Color32::from_rgb(0x7A, 0xD4, 0xFF),
+            icon: Color32::from_rgb(0xD9, 0xDE, 0xE4),
+            hover: Color32::from_rgb(0x23, 0x29, 0x30),
+            pressed: Color32::from_rgb(0x2C, 0x33, 0x3C),
+            checked: Color32::from_rgb(0x17, 0x38, 0x40),
+            accent: Color32::from_rgb(0x22, 0xD3, 0xEE),
+            accent_text: Color32::from_rgb(0x5F, 0xE0, 0xF3),
             // Dark ink on the bright cyan accent (white on it is under 2:1).
-            on_accent: Color32::from_rgb(0x0B, 0x1A, 0x22),
-            input: Color32::from_rgb(0x1B, 0x1F, 0x25),
+            on_accent: Color32::from_rgb(0x07, 0x09, 0x0C),
+            input: Color32::from_rgb(0x0F, 0x12, 0x16),
             // 3:1 on every surface a field sits on (#657).
             input_border: Color32::from_rgb(0x5A, 0x62, 0x6C),
             group_label: Color32::from_rgb(0x8A, 0x93, 0x9C),
             // The text area is lighter than the margins, as in the light theme (#1148).
-            ruler: Color32::from_rgb(0x2F, 0x34, 0x3C),
-            ruler_margin: Color32::from_rgb(0x23, 0x27, 0x2D),
+            ruler: Color32::from_rgb(0x1A, 0x1F, 0x26),
+            ruler_margin: Color32::from_rgb(0x13, 0x17, 0x1D),
             ruler_tick: Color32::from_rgb(0xAE, 0xB4, 0xBB),
-            status_bar: Color32::from_rgb(0x22, 0x26, 0x2C),
+            status_bar: Color32::from_rgb(0x0B, 0x0E, 0x13),
             selection: Color32::from_rgba_unmultiplied(0x22, 0xD3, 0xEE, 0x4A),
             find_highlight: Color32::from_rgba_unmultiplied(0xFF, 0xAE, 0x00, 0x70),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x60),
@@ -405,9 +421,9 @@ impl Tokens {
             guide: Color32::from_rgb(0xE0, 0x4C, 0xB0),
             crop_handle: Color32::BLACK,
             crop_dim: Color32::from_rgba_unmultiplied(0x30, 0x30, 0x30, 0xE0),
-            balloon: Color32::from_rgb(0x2A, 0x2F, 0x36),
-            markup_area: Color32::from_rgb(0x1E, 0x22, 0x28),
-            markup_edge: Color32::from_rgb(0x3A, 0x40, 0x48),
+            balloon: Color32::from_rgb(0x1A, 0x1F, 0x26),
+            markup_area: Color32::from_rgb(0x12, 0x16, 0x1C),
+            markup_edge: Color32::from_rgb(0x26, 0x2B, 0x33),
             resolved_text: Color32::from_rgb(0x5B, 0xC0, 0x8A),
             author_colors: [
                 Color32::from_rgb(0x7F, 0xA8, 0xF2),
@@ -423,7 +439,7 @@ impl Tokens {
                 Color32::from_rgb(0x8E, 0x44, 0xAD),
                 Color32::from_rgb(0xE0, 0x7B, 0x1F),
             ],
-            menu: Color32::from_rgb(0x2A, 0x2F, 0x36),
+            menu: Color32::from_rgb(0x1A, 0x1F, 0x26),
             blue: Color32::from_rgb(0x6C, 0x9B, 0xEA),
             red: Color32::from_rgb(0xEE, 0x6A, 0x6A),
             green: Color32::from_rgb(0x5B, 0xC0, 0x8A),
@@ -432,11 +448,35 @@ impl Tokens {
             close_hover: Color32::from_rgb(0xD6, 0x3C, 0x2C),
             close_pressed: Color32::from_rgb(0xB3, 0x30, 0x23),
             on_close: Color32::WHITE,
+            backdrop_top: Color32::from_rgb(0x14, 0x18, 0x20),
+            backdrop_bottom: Color32::from_rgb(0x07, 0x09, 0x0C),
+            glow: Color32::from_rgb(0x0F, 0x2A, 0x30),
+            glass: Color32::from_rgb(0x16, 0x1A, 0x21),
+            glass_edge: Color32::from_rgb(0x2E, 0x34, 0x3D),
+            pill: Color32::from_rgb(0xD9, 0xDE, 0xE4),
+            pill_text: Color32::from_rgb(0x07, 0x09, 0x0C),
         }
     }
     pub fn get(ctx: &egui::Context) -> Tokens {
         if ctx.global_style().visuals.dark_mode { Tokens::dark() } else { Tokens::light() }
     }
+}
+
+/// Paints the Vidro backdrop behind every panel: the vertical gradient, with the app's colour
+/// glowing softly at the top left.
+pub fn paint_backdrop(ctx: &egui::Context) {
+    let t = Tokens::get(ctx);
+    let rect = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::background());
+    let mut mesh = egui::Mesh::default();
+    let top_left = t.backdrop_top.lerp_to_gamma(t.glow, 0.85);
+    let corners = [(rect.left_top(), top_left), (rect.right_top(), t.backdrop_top), (rect.right_bottom(), t.backdrop_bottom), (rect.left_bottom(), t.backdrop_bottom)];
+    for (pos, color) in corners {
+        mesh.colored_vertex(pos, color);
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(egui::Shape::mesh(mesh));
 }
 
 /// Install the UI fonts (Inter, JetBrains Mono) and the craft-fonts CJK interface faces if built
