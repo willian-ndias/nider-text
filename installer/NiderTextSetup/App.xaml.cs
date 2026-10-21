@@ -28,6 +28,9 @@ public partial class App : Application
             Shutdown();
             return;
         }
-        new MainWindow().Show();
+        var w = new MainWindow();
+        w.Show();
+        // Chamado pelo próprio app ("Atualizar agora"): espera o app fechar, atualiza e reabre, sem perguntar.
+        if (e.Args.Any(a => a.Equals("/atualizar", StringComparison.OrdinalIgnoreCase))) w.AutoUpdate();
     }
 }

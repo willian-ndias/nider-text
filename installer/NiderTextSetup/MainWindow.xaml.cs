@@ -80,6 +80,32 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Atualização pedida pelo app: espera ele fechar (até 60 s), instala e reabre.</summary>
+    public async void AutoUpdate()
+    {
+        Options.Visibility = Visibility.Collapsed;
+        PortableBtn.Visibility = Visibility.Collapsed;
+        SetBusy(true);
+        StatusText.Text = "Esperando o Nider Text fechar…";
+        for (var i = 0; i < 120 && Installer.IsRunning(Installer.InstallDir); i++) await Task.Delay(500);
+        StatusText.Text = "Atualizando…";
+        try
+        {
+            var desktop = System.IO.File.Exists(Installer.DesktopLink);
+            await Task.Run(() => Installer.Install(desktop));
+            StatusText.Text = "Pronto! Abrindo a versão nova…";
+            Installer.Launch();
+            await Task.Delay(800);
+            Close();
+        }
+        catch (Exception ex)
+        {
+            SetBusy(false);
+            PrimaryBtn.Content = "Atualizar";
+            StatusText.Text = "Não foi possível atualizar: " + ex.Message;
+        }
+    }
+
     async void Portable_Click(object sender, RoutedEventArgs e)
     {
         StatusText.Text = "Abrindo sem instalar…";

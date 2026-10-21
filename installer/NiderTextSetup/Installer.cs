@@ -35,7 +35,7 @@ public static class Installer
         catch { }
     }
 
-    static string DesktopLink =>
+    public static string DesktopLink =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Nider Text.lnk");
 
     public static string CurrentVersion

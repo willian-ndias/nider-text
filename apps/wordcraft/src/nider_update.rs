@@ -21,6 +21,57 @@ struct Nova {
 
 static ESTADO: OnceLock<Mutex<Option<Nova>>> = OnceLock::new();
 static FECHADO: AtomicBool = AtomicBool::new(false);
+/// "Atualizar agora" clicado: o instalador está sendo baixado.
+static BAIXANDO: AtomicBool = AtomicBool::new(false);
+static ERRO: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn erro(msg: Option<String>) {
+    if let Ok(mut g) = ERRO.get_or_init(|| Mutex::new(None)).lock() {
+        *g = msg;
+    }
+}
+
+/// Baixa o instalador novo para a pasta temporária e o abre em modo "/atualizar": ele espera
+/// este app fechar, troca a versão instalada e reabre o Nider Text, como no Nider Etapas.
+fn atualizar(ctx: egui::Context, versao: String, link: String) {
+    BAIXANDO.store(true, Ordering::Relaxed);
+    erro(None);
+    std::thread::spawn(move || {
+        let resultado = (|| -> Result<(), String> {
+            let nome: String = versao.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '.' || *c == '-').take(40).collect();
+            let destino = std::env::temp_dir().join(format!("nider-text-setup-{nome}.exe"));
+            let mut cmd = std::process::Command::new("curl");
+            cmd.args(["-s", "-f", "-L", "-m", "900", "-o"]).arg(&destino).arg(&link);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x0800_0000);
+            }
+            let ok = cmd.status().map(|s| s.success()).unwrap_or(false);
+            if !ok {
+                return Err("Não consegui baixar a versão nova. Confira a internet e tente de novo.".into());
+            }
+            // Só um instalador do Windows (começa com "MZ") é aberto.
+            let mut cabeca = [0u8; 2];
+            let lido = std::fs::File::open(&destino).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut cabeca));
+            if lido.is_err() || &cabeca != b"MZ" {
+                let _ = std::fs::remove_file(&destino);
+                return Err("O arquivo baixado não é um instalador do Windows.".into());
+            }
+            std::process::Command::new(&destino).arg("/atualizar").spawn().map_err(|e| format!("Não consegui abrir o instalador: {e}"))?;
+            Ok(())
+        })();
+        match resultado {
+            // O instalador assume: fecha o app (se houver texto não salvo, o app pergunta antes).
+            Ok(()) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            Err(e) => {
+                erro(Some(e));
+                BAIXANDO.store(false, Ordering::Relaxed);
+            }
+        }
+        ctx.request_repaint();
+    });
+}
 
 /// Começa a consulta em segundo plano.
 pub fn iniciar(ctx: egui::Context) {
@@ -103,15 +154,31 @@ pub fn mostrar(ctx: &egui::Context) {
                 ui.label(egui::RichText::new(&nova.notas).small().weak());
             }
             ui.add_space(8.0);
+            if let Some(e) = ERRO.get().and_then(|m| m.lock().ok()).and_then(|g| g.clone()) {
+                ui.label(egui::RichText::new(e).color(ui.visuals().error_fg_color));
+                ui.add_space(4.0);
+            }
+            if BAIXANDO.load(Ordering::Relaxed) {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Baixando a versão nova… o Nider Text vai fechar, atualizar e abrir de novo.");
+                });
+                return;
+            }
             ui.horizontal(|ui| {
-                // Com o link direto, o navegador já baixa o instalador: é só abrir e clicar em Atualizar.
-                let (rotulo, link) = match &nova.download {
-                    Some(d) => ("Atualizar agora", d.as_str()),
-                    None => ("Baixar a versão nova", nova.pagina.as_str()),
-                };
-                if ui.button(rotulo).clicked() {
-                    ui.ctx().open_url(egui::OpenUrl::new_tab(link));
-                    fechar = true;
+                match &nova.download {
+                    // Baixa e atualiza sozinho, sem passar pelo navegador.
+                    Some(d) => {
+                        if ui.button("Atualizar agora").clicked() {
+                            atualizar(ui.ctx().clone(), nova.versao.clone(), d.clone());
+                        }
+                    }
+                    None => {
+                        if ui.button("Baixar a versão nova").clicked() {
+                            ui.ctx().open_url(egui::OpenUrl::new_tab(nova.pagina.as_str()));
+                            fechar = true;
+                        }
+                    }
                 }
                 if ui.button("Depois").clicked() {
                     fechar = true;
