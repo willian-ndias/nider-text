@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace NiderTextSetup;
@@ -20,6 +21,19 @@ public static class Installer
 
     static string StartMenuLink =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Nider Text.lnk");
+
+    static string PinnedLink => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Microsoft", "Internet Explorer", "Quick Launch", "User Pinned", "TaskBar", "Nider Text.lnk");
+
+    [DllImport("shell32.dll")]
+    static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+
+    /// <summary>Avisa o Windows que os ícones mudaram (senão a barra de tarefas e o menu Iniciar ficam com o ícone antigo em cache).</summary>
+    static void RefreshShellIcons()
+    {
+        try { SHChangeNotify(0x08000000 /* SHCNE_ASSOCCHANGED */, 0 /* SHCNF_IDLIST */, IntPtr.Zero, IntPtr.Zero); }
+        catch { }
+    }
 
     static string DesktopLink =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Nider Text.lnk");
@@ -109,6 +123,9 @@ public static class Installer
         CreateShortcut(StartMenuLink, AppExe, dir);
         if (desktopShortcut) CreateShortcut(DesktopLink, AppExe, dir);
         else if (File.Exists(DesktopLink)) File.Delete(DesktopLink);
+        // Atalho fixado na barra de tarefas: recria para o Windows pegar o ícone novo.
+        if (File.Exists(PinnedLink)) CreateShortcut(PinnedLink, AppExe, dir);
+        RefreshShellIcons();
 
         using var k = Registry.CurrentUser.CreateSubKey(RegKey);
         k.SetValue("DisplayName", "Nider Text");
