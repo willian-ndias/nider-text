@@ -19,6 +19,7 @@ mod file_dialogs;
 #[cfg(any(target_os = "windows", target_os = "macos", test))]
 mod graphics;
 mod logging;
+mod nider_update;
 mod print;
 mod region;
 #[cfg(target_os = "macos")]
@@ -90,6 +91,7 @@ impl eframe::App for App {
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.0.ui(ui);
+        nider_update::mostrar(ui.ctx());
         self.3.show(frame);
     }
     fn on_exit(&mut self) {
@@ -423,6 +425,7 @@ fn main() -> eframe::Result {
         "Nider Text",
         options,
         Box::new(move |cc| {
+            nider_update::iniciar(cc.egui_ctx.clone());
             // The system region picks the new document's paper, the units and the decimal
             // separator (#838).
             let region = region::system();
