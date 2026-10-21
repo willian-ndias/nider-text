@@ -253,17 +253,77 @@ impl MacTitleBar {
     }
 }
 
+/// The title bar's height: taller on Windows, where it is the whole caption (the app draws it, so
+/// the brand and the document name read clearly; `window_controls`).
+pub const TITLE_BAR: f32 = if cfg!(target_os = "windows") { 42.0 } else { 38.0 };
+
+/// The Nider Text app icon (assets/app-icon, rendered from wordcraft.svg).
+const BRAND_PNG: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/512x512/apps/ai.storyteller.wordcraft.png");
+
+/// The icon resampled once to exactly `px` device pixels (premultiplied, Lanczos), so it is never
+/// stretched or shrunk again on screen: crisp at every display scale (100 %, 125 %, 150 %…).
+/// `None` if the embedded PNG can't be decoded (then the brand shows the name only).
+fn brand_texture(ctx: &egui::Context, px: u32) -> Option<egui::TextureHandle> {
+    let id = egui::Id::new(("nider_brand_icon", px));
+    if let Some(tex) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return Some(tex);
+    }
+    let rgba = image::load_from_memory_with_format(BRAND_PNG, image::ImageFormat::Png).ok()?.to_rgba8();
+    let mut pre = rgba;
+    for p in pre.pixels_mut() {
+        let a = u16::from(p.0[3]);
+        for c in &mut p.0[..3] {
+            *c = u8::try_from(u16::from(*c) * a / 255).unwrap_or(u8::MAX);
+        }
+    }
+    let small = image::imageops::resize(&pre, px, px, image::imageops::FilterType::Lanczos3);
+    let size = [usize::try_from(px).ok()?, usize::try_from(px).ok()?];
+    let img = egui::ColorImage::from_rgba_premultiplied(size, small.as_raw());
+    let tex = ctx.load_texture("nider_brand_icon", img, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, tex.clone()));
+    Some(tex)
+}
+
+/// The brand at the start of the title bar and the Backstage: the icon, `size` points square and
+/// aligned to whole pixels, then NIDER TEXT ("TEXT" in the app's colour).
+pub fn brand(ui: &mut Ui, size: f32, ink: egui::Color32, accent: egui::Color32) {
+    let ppp = ui.ctx().pixels_per_point();
+    let px = (size * ppp).round().clamp(8.0, 512.0);
+    let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
+    // Snap to the pixel grid, so the texture's pixels land on the screen's one to one.
+    let min = pos2((rect.min.x * ppp).round() / ppp, (rect.min.y * ppp).round() / ppp);
+    let snapped = Rect::from_min_size(min, vec2(px / ppp, px / ppp));
+    // `px` is clamped to 8..=512 above, so the cast is exact.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let px_u = px as u32;
+    if let Some(tex) = brand_texture(ui.ctx(), px_u) {
+        ui.painter().image(tex.id(), snapped, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
+    }
+    ui.add_space(4.0);
+    let font = semibold(14.0);
+    ui.label(egui::RichText::new("NIDER ").font(font.clone()).color(ink).extra_letter_spacing(0.6));
+    ui.label(egui::RichText::new("TEXT").font(font).color(accent).extra_letter_spacing(0.6));
+}
+
 pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     // macOS: shorter, so the system's traffic lights are centred in it; the tallest controls
     // shrink to keep a margin above and below them.
     let mac = app.integrated_titlebar;
     let bar = app.mac_titlebar;
-    let left = if mac { bar.content_left as i8 } else { 8 };
+    let left = if mac { bar.content_left as i8 } else { 10 };
     let control_h = if mac { 22.0 } else { 26.0 };
+    // The app draws the window frame (Windows): the caption buttons sit flush at the right edge.
+    let fullscreen = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
+    let controls = app.window_controls.clone().filter(|_| !fullscreen);
     egui::Panel::top("title_bar")
-        .exact_size(if mac { bar.height } else { 38.0 })
-        .frame(egui::Frame::NONE.fill(t.title_bar).inner_margin(egui::Margin { left, right: 10, top: 0, bottom: 0 }))
+        .exact_size(if mac { bar.height } else { TITLE_BAR })
+        .frame(egui::Frame::NONE.fill(t.title_bar).inner_margin(egui::Margin {
+            left,
+            right: if controls.is_some() { 0 } else { 10 },
+            top: 0,
+            bottom: 0,
+        }))
         .show(ui, |ui| {
             let full = ui.max_rect();
             // Drag the window by the title bar (integrated title bar on macOS).
@@ -279,6 +339,10 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
             let mut right_start = full.max.x;
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+                if !mac {
+                    brand(ui, 26.0, t.text, t.accent_text);
+                    ui.add_space(14.0);
+                }
                 // AutoSave switch: greyed out, with the reason as its tooltip, when AutoSave can't
                 // cover the document (#196, #176); clicking it then offers Save As where that helps.
                 let block = app.autosave_block();
@@ -316,6 +380,19 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                 }
                 qat_end = ui.min_rect().max.x;
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if let Some(controls) = &controls {
+                        // Laid out left to right inside the right-to-left run, so they read
+                        // minimize, maximize, close.
+                        let size = vec2(
+                            crate::window_controls::width(&controls.right) - crate::window_controls::SIDE_GAP,
+                            crate::window_controls::BUTTON_HEIGHT,
+                        );
+                        ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                            ui.spacing_mut().item_spacing.x = 0.0;
+                            crate::window_controls::buttons(ui, &controls.right);
+                        });
+                        ui.add_space(crate::window_controls::SIDE_GAP);
+                    }
                     // Account / community.
                     let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
                     ui.painter().circle_filled(r.center(), control_h / 2.0 - 1.0, t.accent);

@@ -3,7 +3,7 @@
 use egui::{Align2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use serde_json::json;
 
-use crate::theme::{APP_COLOR, Tokens, medium, regular, semibold};
+use crate::theme::{BACKSTAGE_NAV, BRAND_CYAN, Tokens, medium, regular, semibold};
 use crate::{WordApp, icons};
 
 /// The side menu: page id, label and icon (#1714).
@@ -42,7 +42,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         .exact_size(200.0)
         // Fixed width, as in Word: without this egui shows a resize handle that does nothing (#502).
         .resizable(false)
-        .frame(egui::Frame::NONE.fill(if recovery { egui::Color32::BLACK } else { APP_COLOR }).inner_margin(egui::Margin {
+        .frame(egui::Frame::NONE.fill(if recovery { egui::Color32::BLACK } else { BACKSTAGE_NAV }).inner_margin(egui::Margin {
             left: 0,
             right: 0,
             top: if mac { 0 } else { 12 },
@@ -79,6 +79,12 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 app.canvas.want_focus = true;
             }
             ui.add_space(if mac { 12.0 } else { 6.0 });
+            ui.horizontal(|ui| {
+                ui.add_space(20.0);
+                ui.spacing_mut().item_spacing = vec2(0.0, 0.0);
+                crate::chrome::brand(ui, 28.0, egui::Color32::WHITE, BRAND_CYAN);
+            });
+            ui.add_space(14.0);
             for (id, label, icon) in PAGES {
                 // No document open (#1129): Info, Save, Save As, Print and Export are greyed out.
                 let on = has_document || works_without_document(id);
@@ -86,7 +92,8 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, tl!(label)));
                 let active = app.ui.backstage_page == id;
                 if active {
-                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(46));
+                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(30));
+                    ui.painter().rect_filled(Rect::from_min_size(r.min, vec2(3.0, r.height())), 0.0, BRAND_CYAN);
                 } else if on && resp.hovered() {
                     ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
                 }

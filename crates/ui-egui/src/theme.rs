@@ -6,6 +6,11 @@ use egui::{Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily,
 
 /// WordCraft's app colour (and its darker ink for text on light backgrounds).
 pub const APP_COLOR: Color32 = Color32::from_rgb(0x3B, 0x5B, 0xDB);
+/// The Backstage's navigation pane: Nider graphite in both themes (the brand's ground), with the
+/// app's cyan marking the open page. White text on it is 18:1.
+pub const BACKSTAGE_NAV: Color32 = Color32::from_rgb(0x0D, 0x10, 0x14);
+/// Nider Text's cyan (the icon's), legible on [`BACKSTAGE_NAV`].
+pub const BRAND_CYAN: Color32 = Color32::from_rgb(0x22, 0xD3, 0xEE);
 pub const APP_INK: Color32 = Color32::from_rgb(0x1B, 0x7F, 0xB0);
 
 /// The interface theme setting (File › Options › General, View › Interface Theme): a fixed light or
@@ -359,36 +364,40 @@ impl Tokens {
             on_close: Color32::WHITE,
         }
     }
+    /// Nider Titânio (the Nider Terminal's chrome, NIDER_VISUAL §17): graphite surfaces, silver
+    /// lines, warm light text; the accent is the app's cyan (its icon).
     pub fn dark() -> Self {
         Tokens {
             dark: true,
-            title_bar: Color32::from_rgb(0x0F, 0x12, 0x16),
-            ribbon: Color32::from_rgb(0x1D, 0x21, 0x27),
-            tab_strip: Color32::from_rgb(0x0F, 0x12, 0x16),
-            canvas: Color32::from_rgb(0x0B, 0x0D, 0x10),
-            panel: Color32::from_rgb(0x18, 0x1C, 0x21),
-            border: Color32::from_rgb(0x2C, 0x32, 0x3A),
-            border_strong: Color32::from_rgb(0x3F, 0x47, 0x51),
-            text: Color32::from_rgb(0xEE, 0xF3, 0xF6),
-            text_dim: Color32::from_rgb(0x9A, 0xA6, 0xAF),
-            text_disabled: Color32::from_rgb(0x6B, 0x76, 0x80),
-            icon: Color32::from_rgb(0xD6, 0xDE, 0xE3),
-            hover: Color32::from_rgb(0x2A, 0x30, 0x38),
-            pressed: Color32::from_rgb(0x34, 0x3B, 0x44),
-            checked: Color32::from_rgb(0x34, 0x3C, 0x46),
-            accent: Color32::from_rgb(0x46, 0xC3, 0xFF),
-            accent_text: Color32::from_rgb(0x46, 0xC3, 0xFF),
-            // Dark text on the light dark-theme accent: white on #7a93f0 is only 2.9:1 (#655).
-            on_accent: Color32::from_rgb(0x0B, 0x0D, 0x10),
-            input: Color32::from_rgb(0x14, 0x18, 0x20),
-            input_border: Color32::from_rgb(0x6B, 0x76, 0x80),
-            group_label: Color32::from_rgb(0x9A, 0xA6, 0xAF),
+            title_bar: Color32::from_rgb(0x0D, 0x10, 0x14),
+            ribbon: Color32::from_rgb(0x15, 0x19, 0x1F),
+            tab_strip: Color32::from_rgb(0x0D, 0x10, 0x14),
+            canvas: Color32::from_rgb(0x07, 0x09, 0x0C),
+            panel: Color32::from_rgb(0x12, 0x15, 0x1A),
+            border: Color32::from_rgb(0x26, 0x2B, 0x33),
+            border_strong: Color32::from_rgb(0x3A, 0x41, 0x4B),
+            // Neutral greys for text and fields: equation pictures are tinted with them (#1002).
+            text: Color32::from_rgb(0xF2, 0xF2, 0xF2),
+            text_dim: Color32::from_rgb(0xB8, 0xB4, 0xAE),
+            text_disabled: Color32::from_rgb(0x6E, 0x76, 0x80),
+            icon: Color32::from_rgb(0xD9, 0xDE, 0xE4),
+            hover: Color32::from_rgb(0x22, 0x27, 0x2E),
+            pressed: Color32::from_rgb(0x2B, 0x31, 0x39),
+            checked: Color32::from_rgb(0x1B, 0x33, 0x3A),
+            accent: Color32::from_rgb(0x22, 0xD3, 0xEE),
+            accent_text: Color32::from_rgb(0x5E, 0xE4, 0xF7),
+            // Dark ink on the bright cyan accent (white on it is under 2:1).
+            on_accent: Color32::from_rgb(0x04, 0x1A, 0x20),
+            input: Color32::from_rgb(0x0D, 0x0D, 0x0D),
+            // 3:1 on every surface a field sits on (#657).
+            input_border: Color32::from_rgb(0x64, 0x6C, 0x78),
+            group_label: Color32::from_rgb(0x8A, 0x93, 0x9C),
             // The text area is lighter than the margins, as in the light theme (#1148).
-            ruler: Color32::from_rgb(0x2C, 0x32, 0x3A),
-            ruler_margin: Color32::from_rgb(0x1D, 0x21, 0x27),
-            ruler_tick: Color32::from_rgb(0x9A, 0xA6, 0xAF),
-            status_bar: Color32::from_rgb(0x0F, 0x12, 0x16),
-            selection: Color32::from_rgba_unmultiplied(0x46, 0xC3, 0xFF, 0x55),
+            ruler: Color32::from_rgb(0x26, 0x2B, 0x33),
+            ruler_margin: Color32::from_rgb(0x15, 0x19, 0x1F),
+            ruler_tick: Color32::from_rgb(0x8A, 0x93, 0x9C),
+            status_bar: Color32::from_rgb(0x0D, 0x10, 0x14),
+            selection: Color32::from_rgba_unmultiplied(0x22, 0xD3, 0xEE, 0x4A),
             find_highlight: Color32::from_rgba_unmultiplied(0xFF, 0xAE, 0x00, 0x70),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x60),
             handle: Color32::from_rgb(0xF2, 0xF2, 0xF2),

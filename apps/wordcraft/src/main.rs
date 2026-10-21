@@ -384,6 +384,12 @@ fn main() -> eframe::Result {
     if let Some(icon) = app_icon() {
         options.viewport = options.viewport.with_icon(icon);
     }
+    // Windows (Nider): the app draws its own title bar (brand, document name, caption buttons);
+    // WORDCRAFT_TITLEBAR=system keeps the system's caption.
+    let app_frame = cfg!(target_os = "windows") && std::env::var("WORDCRAFT_TITLEBAR").ok().as_deref().map(str::trim) != Some("system");
+    if app_frame {
+        options.viewport = options.viewport.with_decorations(false);
+    }
     // Before eframe creates the wgpu instance: default Windows to DirectX 12 only, or OpenGL when
     // DirectX 12 has no GPU driver or this is a 32-bit build, and compile DirectX 12 shaders with
     // FXC, which needs no DLL of ours (#603; see graphics.rs).
@@ -444,6 +450,9 @@ fn main() -> eframe::Result {
             }
             app.ui.window = restored;
             app.integrated_titlebar = cfg!(target_os = "macos");
+            if app_frame {
+                app.window_controls = Some(wordcraft_ui_egui::window_controls::Layout::default());
+            }
             #[cfg(target_os = "macos")]
             if let Some(bar) = traffic_lights::title_bar() {
                 log::info!("title bar: {bar:?}");

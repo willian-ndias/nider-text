@@ -93,7 +93,7 @@
         </Grid.Background>
 
         <StackPanel Margin="40,34,40,24">
-            <Image Source="pack://application:,,,/logo.png" Width="120" Height="120" HorizontalAlignment="Left"/>
+            <Image Source="{StaticResource NiderLogo}" Width="120" Height="120" HorizontalAlignment="Left"/>
             <TextBlock Text="Nider Text" FontSize="40" FontWeight="SemiBold" Margin="0,14,0,0"/>
             <TextBlock Text="Editor de texto e diagramação de livros" FontSize="16" Foreground="#9AA6AF" Margin="0,4,0,0"/>
             <TextBlock Text="Escreva, formate e diagrame livros em PDF pronto para a gráfica, direto do seu computador."

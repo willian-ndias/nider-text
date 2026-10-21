@@ -82,6 +82,7 @@ pub mod table_ruler;
 pub mod theme;
 pub mod widgets;
 pub mod window_close;
+pub mod window_controls;
 pub mod window_geometry;
 pub mod wordart_menus;
 pub mod zotero;
@@ -524,6 +525,9 @@ pub struct WordApp {
     pub(crate) dialog_pick: Option<String>,
     /// macOS: the window has no title bar; leave room for the traffic lights.
     pub integrated_titlebar: bool,
+    /// Windows (Nider): the app draws the window frame — its title bar carries these buttons and
+    /// thin zones along the edges resize the window (`window_controls`). `None`: the system's frame.
+    pub window_controls: Option<window_controls::Layout>,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
@@ -664,6 +668,7 @@ impl WordApp {
             status_msg: None,
             previews: previews::Previews::default(),
             integrated_titlebar: false,
+            window_controls: None,
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
             shot_token: 0,
@@ -2209,6 +2214,11 @@ impl WordApp {
             let _ = self.run("view.focus", json!({"value": false}));
         }
         if self.ui.backstage {
+            // The app's own frame (Windows): the Backstage keeps the title bar, so the window can
+            // still be moved, minimized and closed.
+            if self.window_controls.is_some() {
+                chrome::title_bar(self, ui);
+            }
             backstage::show(self, ui);
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
@@ -2226,6 +2236,9 @@ impl WordApp {
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {
                 canvas::show(self, ui);
             });
+        }
+        if self.window_controls.is_some() {
+            window_controls::resize_edges(&ctx);
         }
         content_controls::popup(self, &ctx);
         dialogs::show(self, &ctx);
