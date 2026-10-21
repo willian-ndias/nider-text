@@ -19,6 +19,8 @@ jobs:
       WORDCRAFT_BUILD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Fontes do WordCraft (craft-fonts)
         uses: actions/checkout@v4
         with:
@@ -72,6 +74,22 @@ jobs:
           name: nider-text-windows-x64
           path: dist/release/*
           if-no-files-found: error
+      - name: Notas da versão (o que mudou desde a versão anterior)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          atual="${GITHUB_REF_NAME}"
+          git rev-parse -q --verify "refs/tags/$atual" >/dev/null || atual="HEAD"
+          anterior=$(git describe --tags --abbrev=0 --match 'v*' "$atual^" 2>/dev/null || true)
+          {
+            echo "## O que há de novo"
+            echo
+            git log ${anterior:+$anterior..}$atual --no-merges --pretty='- %s' \
+              | grep -v -i -E 'dependabot|^- (bump|chore\(deps\)|ci\(deps\))|ui_shot|^- Merge ' | head -40 || true
+            echo
+            echo "_Se o Windows avisar que o aplicativo não é reconhecido, clique em **Mais informações** e depois em **Executar assim mesmo**._"
+          } > notas.md
+          cat notas.md
       - name: Publicar versão no GitHub
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -80,4 +98,4 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           gh release create "$tag" dist/release/nider-text-* --title "Nider Text $tag" --prerelease \
-            --notes "Instalador do Nider Text para Windows (x64). Versão em teste. Se o Windows avisar que o aplicativo não é reconhecido, clique em Mais informações e depois em Executar assim mesmo."
+            --notes-file notas.md
