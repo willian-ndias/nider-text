@@ -15,6 +15,8 @@ struct Nova {
     versao: String,
     notas: String,
     pagina: String,
+    /// Link direto do instalador novo (o site manda quando a atualização é pública).
+    download: Option<String>,
 }
 
 static ESTADO: OnceLock<Mutex<Option<Nova>>> = OnceLock::new();
@@ -56,8 +58,13 @@ fn consultar() -> Option<Nova> {
         .filter(|p| p.starts_with("https://nider.com.br/") && !p.contains(['"', '\\', ' ']))
         .unwrap_or(PAGINA)
         .to_string();
+    let download = v
+        .get("download")
+        .and_then(|d| d.as_str())
+        .filter(|d| d.starts_with("https://nider.com.br/") && !d.contains(['"', '\\', ' ']))
+        .map(str::to_string);
     let notas = v.get("notas").and_then(|n| n.as_str()).unwrap_or("").chars().take(600).collect();
-    Some(Nova { versao, notas, pagina })
+    Some(Nova { versao, notas, pagina, download })
 }
 
 /// `0.1.5-alfa` → (0, 1, 5). Sufixos (-alfa, +build) não contam; o que não for número dá None.
@@ -97,8 +104,13 @@ pub fn mostrar(ctx: &egui::Context) {
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.button("Baixar a versão nova").clicked() {
-                    ui.ctx().open_url(egui::OpenUrl::new_tab(&nova.pagina));
+                // Com o link direto, o navegador já baixa o instalador: é só abrir e clicar em Atualizar.
+                let (rotulo, link) = match &nova.download {
+                    Some(d) => ("Atualizar agora", d.as_str()),
+                    None => ("Baixar a versão nova", nova.pagina.as_str()),
+                };
+                if ui.button(rotulo).clicked() {
+                    ui.ctx().open_url(egui::OpenUrl::new_tab(link));
                     fechar = true;
                 }
                 if ui.button("Depois").clicked() {
