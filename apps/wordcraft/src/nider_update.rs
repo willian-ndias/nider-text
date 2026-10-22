@@ -132,6 +132,21 @@ fn mais_nova(publicada: &str, atual: &str) -> bool {
     matches!((numeros(publicada), numeros(atual)), (Some(p), Some(a)) if p > a)
 }
 
+/// Seta para baixo que desce e some, em ciclo, enquanto o instalador baixa.
+fn seta_baixando(ui: &mut egui::Ui, cor: egui::Color32) {
+    ui.ctx().request_repaint();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(18.0, 22.0), egui::Sense::hover());
+    let fase = (ui.input(|i| i.time) * 1.5).fract() as f32;
+    let tinta = cor.gamma_multiply(1.0 - fase * 0.85);
+    let cx = rect.center().x;
+    let y = rect.top() + 3.0 + fase * (rect.height() - 12.0);
+    let p = ui.painter();
+    let traco = egui::Stroke::new(2.0, tinta);
+    p.line_segment([egui::pos2(cx, y - 5.0), egui::pos2(cx, y + 3.0)], traco);
+    p.line_segment([egui::pos2(cx - 4.5, y), egui::pos2(cx, y + 5.0)], traco);
+    p.line_segment([egui::pos2(cx + 4.5, y), egui::pos2(cx, y + 5.0)], traco);
+}
+
 /// Desenha o aviso (a cada quadro) enquanto houver versão nova e a pessoa não tiver fechado.
 pub fn mostrar(ctx: &egui::Context) {
     if FECHADO.load(Ordering::Relaxed) {
@@ -160,7 +175,8 @@ pub fn mostrar(ctx: &egui::Context) {
             }
             if BAIXANDO.load(Ordering::Relaxed) {
                 ui.horizontal(|ui| {
-                    ui.spinner();
+                    let cor = ui.visuals().text_color();
+                    seta_baixando(ui, cor);
                     ui.label("Baixando a versão nova… o Nider Text vai fechar, atualizar e abrir de novo.");
                 });
                 return;
