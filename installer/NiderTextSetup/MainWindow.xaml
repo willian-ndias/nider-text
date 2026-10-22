@@ -120,7 +120,7 @@
                 <Run Text="  ·  "/>
                 <Hyperlink NavigateUri="mailto:nider@nider.com.br" RequestNavigate="Link_Navigate" Foreground="#9AA6AF">nider@nider.com.br</Hyperlink>
             </TextBlock>
-            <TextBlock Text="Baseado no WordCraft (código aberto, MIT ou Apache-2.0)." FontSize="11" Foreground="#6B7680" Margin="0,6,0,0"/>
+            <TextBlock Text="Nider Company  ·  Willian Dias" FontSize="11" Foreground="#6B7680" Margin="0,6,0,0"/>
         </StackPanel>
     </Grid>
 </Window>
