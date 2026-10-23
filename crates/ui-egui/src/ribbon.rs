@@ -347,7 +347,11 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     }
                     let (share_size, share_text) = if plan.buttons < 2 { (((share_w + 36.0).max(74.0), 24.0), true) } else { ((30.0, 24.0), false) };
                     let (r, resp) = ui.allocate_exact_size(vec2(share_size.0, share_size.1), Sense::click());
-                    ui.painter().rect_filled(r, 4.0, if resp.hovered() { t.accent_text } else { t.accent });
+                    ui.painter().rect_filled(
+                        r,
+                        if crate::widgets::PILLS { 11.0 } else { 4.0 },
+                        if resp.hovered() { t.accent_text } else { t.accent },
+                    );
                     let icon_x = if share_text { r.min.x + 14.0 } else { r.center().x };
                     icons::paint(
                         ui.painter(),
@@ -489,6 +493,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     if app.ui.ribbon_collapsed {
         return;
     }
+    if crate::widgets::PILLS {
+        pill_ribbon(app, ui, &user_tabs, &t);
+        return;
+    }
     egui::Panel::top("ribbon")
         .exact_size(CONTENT_H + LABEL_H + 10.0)
         .frame(
@@ -574,6 +582,67 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         });
 }
 
+/// Model B: the open tab's groups as glass pills in rows that wrap with the window, under the tabs
+/// in the same card (no sideways scrolling, nothing folded away).
+fn pill_ribbon(app: &mut WordApp, ui: &mut Ui, user_tabs: &[wordcraft_engine::ribbon::TabEntry], t: &Tokens) {
+    egui::Panel::top("ribbon")
+        .resizable(false)
+        .frame(
+            egui::Frame::NONE
+                .fill(t.glass)
+                .corner_radius(egui::CornerRadius { nw: 0, ne: 0, sw: 18, se: 18 })
+                .inner_margin(egui::Margin { left: 12, right: 12, top: 4, bottom: 10 })
+                .outer_margin(egui::Margin { left: 16, right: 16, top: 0, bottom: 12 }),
+        )
+        .show(ui, |ui| {
+            if !app.has_document() && app.ui.tab != "Help" {
+                ui.disable();
+            }
+            let bg = ui.interact(ui.max_rect(), ui.id().with("ribbon_background"), Sense::click());
+            bg.context_menu(|ui| crate::widgets::customize_menu_items(ui, app));
+            let entry = user_tabs.iter().find(|e| e.name == app.ui.tab);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(0.0, 8.0);
+                match entry {
+                    Some(e) if e.hidden => return,
+                    Some(e) if e.custom => return custom_groups(app, ui, &e.groups),
+                    _ => {}
+                }
+                tab_groups(app, ui);
+                if let Some(e) = entry {
+                    custom_groups(app, ui, &e.groups);
+                }
+            });
+        });
+}
+
+/// The open tab's groups.
+fn tab_groups(app: &mut WordApp, ui: &mut Ui) {
+    match app.ui.tab.as_str() {
+        "Home" => home(app, ui),
+        "Insert" => insert(app, ui),
+        "Draw" => draw(app, ui),
+        "Design" => design(app, ui),
+        "Layout" => layout(app, ui),
+        "References" => references(app, ui),
+        "Mailings" => mailings(app, ui),
+        "Review" => review(app, ui),
+        "View" => view(app, ui),
+        "Developer" => developer(app, ui),
+        "Zotero" => zotero(app, ui),
+        "Help" => help(app, ui),
+        "Table Design" => table_design(app, ui),
+        "Table Layout" => table_layout(app, ui),
+        "Equation" if app.session.math.is_some() => crate::equation_tab::show(app, ui),
+        "Picture Format" => picture_format(app, ui),
+        "Shape Format" => shape_format(app, ui),
+        "SmartArt Design" => smart_art_design(app, ui),
+        "Outlining" => outlining(app, ui),
+        "Chart Design" => chart_design(app, ui),
+        _ => home(app, ui),
+    }
+}
+
 /// Custom groups (Customize Ribbon, #379): up to three commands as large buttons, more as small
 /// labelled buttons in columns of three. Each shows the command's own icon and label.
 fn custom_groups(app: &mut WordApp, ui: &mut Ui, groups: &[wordcraft_engine::ribbon::CustomGroup]) {
@@ -639,6 +708,14 @@ fn esc_cancelled(ui: &Ui, r: &egui::Response, id: egui::Id) -> bool {
 }
 
 fn stack(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    // Model B: one row; the group's buttons sit side by side in its pill.
+    if crate::widgets::PILLS {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+            add(ui);
+        });
+        return;
+    }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
         add(ui);
@@ -1206,9 +1283,12 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
             });
         });
     });
-    group(ui, "Styles", Some("styles.pane"), app, |ui, app| {
-        crate::previews::style_gallery(app, ui, &st);
-    });
+    // Model B: the styles are the side panel (`nider_styles`).
+    if !crate::widgets::PILLS {
+        group(ui, "Styles", Some("styles.pane"), app, |ui, app| {
+            crate::previews::style_gallery(app, ui, &st);
+        });
+    }
     group(ui, "Editing", None, app, |ui, app| {
         stack(ui, |ui| {
             menu_button(ui, app, "find", Some("Find"), "Find", false, "edit.find", |ui, app| {

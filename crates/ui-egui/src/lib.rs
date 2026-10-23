@@ -62,6 +62,7 @@ pub mod ink;
 pub mod keys;
 pub mod keytips;
 pub mod mini_toolbar;
+pub mod nider_styles;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -2240,6 +2241,7 @@ impl WordApp {
                 ribbon::show(self, ui);
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
+                nider_styles::show(self, ui);
             }
             egui::CentralPanel::default().frame(work).show(ui, |ui| {
                 canvas::show(self, ui);

@@ -150,6 +150,26 @@ pub fn builtin_menu(ui: &mut Ui, app: &mut WordApp) {
 pub fn insert_button(ui: &mut Ui, app: &mut WordApp) {
     let t = Tokens::get(ui.ctx());
     let label = tl!("Equation");
+    if crate::widgets::PILLS {
+        // Model B: a small split button (the equation; its arrow opens the built-in ones).
+        let h = crate::widgets::PILL_BUTTON;
+        let (r, rt) = ui.allocate_exact_size(vec2(26.0, h), Sense::click());
+        let (ar, rb) = ui.allocate_exact_size(vec2(11.0, h), Sense::click());
+        for (rr, resp) in [(r, &rt), (ar, &rb)] {
+            if resp.hovered() {
+                ui.painter().rect_filled(rr, 4.0, t.hover);
+            }
+        }
+        crate::icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(17.0, 17.0)), "equation", t.icon, t.accent);
+        crate::icons::paint(ui.painter(), Rect::from_center_size(ar.center(), vec2(8.0, 8.0)), "dropdown", t.icon, t.icon);
+        rt.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+        if rt.on_hover_text(tl!("Insert a new equation (Alt+=)")).clicked() {
+            let _ = app.run("insert.equation", json!({}));
+            app.canvas.want_focus = true;
+        }
+        egui::Popup::menu(&rb).show(|ui| builtin_menu(ui, app));
+        return;
+    }
     let w = (ui.ctx().fonts_mut(|f| f.layout_no_wrap(label.to_string(), regular(11.5), t.text).size().x) + 22.0).max(48.0);
     let (r, _) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::hover());
     let top = Rect::from_min_max(r.min, pos2(r.max.x, r.min.y + BIG_LABEL_Y - 2.0));

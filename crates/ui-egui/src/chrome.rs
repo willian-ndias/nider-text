@@ -305,6 +305,78 @@ pub fn brand(ui: &mut Ui, size: f32, ink: egui::Color32, accent: egui::Color32) 
     ui.label(egui::RichText::new("TEXT").font(font).color(accent).extra_letter_spacing(1.2));
 }
 
+/// Model B's brand: the icon, NIDER TEXT and, under it, the document's file name and state.
+fn brand_b(ui: &mut Ui, app: &mut WordApp, t: &Tokens) {
+    let ppp = ui.ctx().pixels_per_point();
+    let size = 30.0;
+    let px = (size * ppp).round().clamp(8.0, 512.0);
+    let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
+    let min = pos2((rect.min.x * ppp).round() / ppp, (rect.min.y * ppp).round() / ppp);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let px_u = px as u32;
+    if let Some(tex) = brand_texture(ui.ctx(), px_u) {
+        ui.painter().image(
+            tex.id(),
+            Rect::from_min_size(min, vec2(px / ppp, px / ppp)),
+            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+            egui::Color32::WHITE,
+        );
+    }
+    ui.add_space(10.0);
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing = vec2(0.0, 1.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(0.0, 0.0);
+            let font = semibold(15.0);
+            ui.label(egui::RichText::new("NIDER ").font(font.clone()).color(t.text).extra_letter_spacing(1.2));
+            ui.label(egui::RichText::new("TEXT").font(font).color(t.accent_text).extra_letter_spacing(1.2));
+        });
+        if !app.has_document() {
+            return;
+        }
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(0.0, 0.0);
+            let name = app
+                .session
+                .path
+                .as_ref()
+                .and_then(|p| p.file_name())
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| format!("{}.docx", app.title_stem()));
+            let name: String = name.chars().take(60).collect();
+            let resp = ui.add(egui::Label::new(egui::RichText::new(&name).font(regular(11.5)).color(t.text_dim)).sense(Sense::click()));
+            if resp.on_hover_text(tl!("Rename Document")).clicked() {
+                let _ = app.run("file.rename", json!({}));
+            }
+            ui.label(egui::RichText::new(" · ").font(regular(11.5)).color(t.text_dim));
+            let block = app.autosave_block();
+            let (state, color) = if app.autosaves() && !app.session.dirty {
+                (tl!("saved automatically"), t.green)
+            } else if app.session.dirty {
+                (tl!("Edited"), t.orange)
+            } else if app.session.path.is_some() {
+                (tl!("Saved"), t.text_dim)
+            } else {
+                (tl!("Not saved"), t.orange)
+            };
+            let tip =
+                block.as_ref().map_or_else(|| tl!("AutoSave saves every change to the file (needs a saved document)").to_string(), |b| b.reason());
+            let resp = ui.add(egui::Label::new(egui::RichText::new(state).font(regular(11.5)).color(color)).sense(Sense::click()));
+            if resp.on_hover_text(format!("{} — {tip}", tl!("AutoSave"))).clicked() {
+                match block {
+                    None => {
+                        let _ = app.run("file.autosave", json!({}));
+                    }
+                    Some(b) if b.save_as_helps() => {
+                        let _ = app.save_as(crate::file_dialogs::AfterSave::AutoSave);
+                    }
+                    Some(b) => app.status(b.reason()),
+                }
+            }
+        });
+    });
+}
+
 /// Temp-data key: the update the desktop app found (`UpdateBadge`), shown as the title bar's
 /// update button (Nider, as in Nider Etapas).
 pub const UPDATE_BADGE: &str = "nider_update_badge";
@@ -415,46 +487,58 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
             let mut right_start = full.max.x;
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
-                if !mac {
-                    brand(ui, 26.0, t.text, t.accent_text);
-                    ui.add_space(14.0);
-                }
-                // AutoSave switch: greyed out, with the reason as its tooltip, when AutoSave can't
-                // cover the document (#196, #176); clicking it then offers Save As where that helps.
-                let block = app.autosave_block();
-                let on = app.autosaves();
-                let label = if block.is_some() { t.text_dim.gamma_multiply(0.6) } else { t.text_dim };
-                ui.label(egui::RichText::new(tl!("AutoSave")).font(regular(11.5)).color(label));
-                let (r, resp) = ui.allocate_exact_size(vec2(30.0, 16.0), Sense::click());
-                let (fill, stroke, knob_fill) = match (&block, on) {
-                    (Some(_), _) => (t.input.gamma_multiply(0.5), t.border.gamma_multiply(0.7), t.text_dim.gamma_multiply(0.45)),
-                    (None, true) => (t.accent, t.accent, t.on_accent),
-                    (None, false) => (t.input, t.border_strong, t.text_dim),
-                };
-                ui.painter().rect(r, 8.0, fill, Stroke::new(1.0, stroke), egui::StrokeKind::Inside);
-                let knob = if on { r.max.x - 8.0 } else { r.min.x + 8.0 };
-                ui.painter().circle_filled(pos2(knob, r.center().y), 5.0, knob_fill);
-                let tip = block
-                    .as_ref()
-                    .map_or_else(|| tl!("AutoSave saves every change to the file (needs a saved document)").to_string(), |b| b.reason());
-                if resp.on_hover_text(tip).clicked() {
-                    match block {
-                        None => {
-                            let _ = app.run("file.autosave", json!({}));
-                        }
-                        // AutoSave comes on once Save As has saved (maybe on a later frame, #94).
-                        Some(b) if b.save_as_helps() => {
-                            let _ = app.save_as(crate::file_dialogs::AfterSave::AutoSave);
-                        }
-                        Some(b) => app.status(b.reason()),
+                if !mac && crate::widgets::PILLS {
+                    // Model B: the brand with the document under it: the file's name and whether
+                    // it is saved ("salvo automaticamente" in green while AutoSave covers it). A
+                    // click on the name renames; a click on the state switches AutoSave.
+                    brand_b(ui, app, &t);
+                    ui.add_space(18.0);
+                    if app.ui.quick_access_toolbar {
+                        quick_access(ui, app);
                     }
+                    qat_end = ui.min_rect().max.x;
+                } else {
+                    if !mac {
+                        brand(ui, 26.0, t.text, t.accent_text);
+                        ui.add_space(14.0);
+                    }
+                    // AutoSave switch: greyed out, with the reason as its tooltip, when AutoSave can't
+                    // cover the document (#196, #176); clicking it then offers Save As where that helps.
+                    let block = app.autosave_block();
+                    let on = app.autosaves();
+                    let label = if block.is_some() { t.text_dim.gamma_multiply(0.6) } else { t.text_dim };
+                    ui.label(egui::RichText::new(tl!("AutoSave")).font(regular(11.5)).color(label));
+                    let (r, resp) = ui.allocate_exact_size(vec2(30.0, 16.0), Sense::click());
+                    let (fill, stroke, knob_fill) = match (&block, on) {
+                        (Some(_), _) => (t.input.gamma_multiply(0.5), t.border.gamma_multiply(0.7), t.text_dim.gamma_multiply(0.45)),
+                        (None, true) => (t.accent, t.accent, t.on_accent),
+                        (None, false) => (t.input, t.border_strong, t.text_dim),
+                    };
+                    ui.painter().rect(r, 8.0, fill, Stroke::new(1.0, stroke), egui::StrokeKind::Inside);
+                    let knob = if on { r.max.x - 8.0 } else { r.min.x + 8.0 };
+                    ui.painter().circle_filled(pos2(knob, r.center().y), 5.0, knob_fill);
+                    let tip = block
+                        .as_ref()
+                        .map_or_else(|| tl!("AutoSave saves every change to the file (needs a saved document)").to_string(), |b| b.reason());
+                    if resp.on_hover_text(tip).clicked() {
+                        match block {
+                            None => {
+                                let _ = app.run("file.autosave", json!({}));
+                            }
+                            // AutoSave comes on once Save As has saved (maybe on a later frame, #94).
+                            Some(b) if b.save_as_helps() => {
+                                let _ = app.save_as(crate::file_dialogs::AfterSave::AutoSave);
+                            }
+                            Some(b) => app.status(b.reason()),
+                        }
+                    }
+                    ui.add_space(8.0);
+                    // Hidden (#1945): neither the buttons nor the … menu; the title centres as before.
+                    if app.ui.quick_access_toolbar {
+                        quick_access(ui, app);
+                    }
+                    qat_end = ui.min_rect().max.x;
                 }
-                ui.add_space(8.0);
-                // Hidden (#1945): neither the buttons nor the … menu; the title centres as before.
-                if app.ui.quick_access_toolbar {
-                    quick_access(ui, app);
-                }
-                qat_end = ui.min_rect().max.x;
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if let Some(controls) = &controls {
                         // Laid out left to right inside the right-to-left run, so they read
@@ -508,19 +592,32 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                         let _ = app.run("ui.theme", json!({"value": next}));
                     }
                     ui.add_space(6.0);
-                    // Account / community.
-                    let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
-                    ui.painter().circle_filled(r.center(), control_h / 2.0 - 1.0, t.accent);
-                    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Account")));
-                    let initials: String = app.session.user_initials().chars().take(2).collect();
-                    ui.painter().text(r.center(), Align2::CENTER_CENTER, initials, semibold(10.5), t.on_accent);
-                    if resp.on_hover_text(format!("{} — set your name in File › Options", app.session.author)).clicked() {
-                        let _ = app.run("ui.backstage", json!({"value": true, "page": "options", "pane": "general"}));
+                    // Account / community (model B leaves it to File › Options).
+                    if !crate::widgets::PILLS {
+                        let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
+                        ui.painter().circle_filled(r.center(), control_h / 2.0 - 1.0, t.accent);
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Account")));
+                        let initials: String = app.session.user_initials().chars().take(2).collect();
+                        ui.painter().text(r.center(), Align2::CENTER_CENTER, initials, semibold(10.5), t.on_accent);
+                        if resp.on_hover_text(format!("{} — set your name in File › Options", app.session.author)).clicked() {
+                            let _ = app.run("ui.backstage", json!({"value": true, "page": "options", "pane": "general"}));
+                        }
+                        ui.add_space(8.0);
                     }
-                    ui.add_space(8.0);
-                    // Search ("Tell me").
-                    let (r, resp) = ui.allocate_exact_size(vec2(260.0, control_h), Sense::click());
-                    ui.painter().rect(r, 6.0, if resp.hovered() { t.input } else { t.ribbon }, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
+                    // Search ("Tell me"); model B: a rounded glass field.
+                    let (r, resp) = ui.allocate_exact_size(vec2(260.0, if crate::widgets::PILLS { 32.0 } else { control_h }), Sense::click());
+                    if crate::widgets::PILLS {
+                        let (fill, edge) = crate::widgets::pill_colors(&t);
+                        ui.painter().rect(r, 10.0, if resp.hovered() { t.hover } else { fill }, Stroke::new(1.0, edge), egui::StrokeKind::Inside);
+                    } else {
+                        ui.painter().rect(
+                            r,
+                            6.0,
+                            if resp.hovered() { t.input } else { t.ribbon },
+                            Stroke::new(1.0, t.border),
+                            egui::StrokeKind::Inside,
+                        );
+                    }
                     icons::paint(
                         ui.painter(),
                         Rect::from_center_size(pos2(r.min.x + 16.0, r.center().y), vec2(16.0, 16.0)),
@@ -553,7 +650,10 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                     right_start = ui.min_rect().min.x;
                 });
             });
-            // Centred title.
+            // Centred title (model B names the document under the brand instead).
+            if crate::widgets::PILLS && !mac {
+                return;
+            }
             let title = if !app.has_document() {
                 // No document open (#1129): the app's name alone.
                 "Nider Text".to_string()

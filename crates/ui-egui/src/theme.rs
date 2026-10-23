@@ -491,7 +491,8 @@ pub fn paint_backdrop(ctx: &egui::Context) {
         rect.left_top() + egui::vec2(rect.width() * 0.16, -rect.height() * 0.06),
         egui::vec2(rect.width() * 0.55, rect.height() * 0.62),
         t.glow,
-        if t.dark { 55 } else { 90 },
+        // Model B: graphite; the app's colour only hints at the corner.
+        if t.dark { 16 } else { 60 },
     );
     if t.dark {
         glow(

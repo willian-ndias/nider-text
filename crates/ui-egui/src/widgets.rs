@@ -16,6 +16,36 @@ pub const BIG_ICON_Y: f32 = 18.0;
 pub const BIG_LABEL_Y: f32 = 36.0;
 pub const LABEL_PITCH: f32 = 13.0;
 pub const LABEL_LINE_H: f32 = 14.0;
+
+/// Nider "Vidro" (model B): the ribbon is low rows of glass pills, groups side by side and
+/// wrapping to a second row, with small buttons only (the label moves to the tooltip); the Styles
+/// gallery becomes the side panel (`nider_styles`). Off in the unit tests, which pin Word's ribbon
+/// geometry (group heights, folding, keytips).
+pub const PILLS: bool = !cfg!(test);
+/// Height of a pill and of the buttons in it.
+pub const PILL_H: f32 = 32.0;
+pub const PILL_BUTTON: f32 = 26.0;
+
+/// A pill's glass: a faint wash of the text colour with a slightly stronger edge.
+pub fn pill_colors(t: &Tokens) -> (Color32, Color32) {
+    if t.dark {
+        (Color32::from_rgba_unmultiplied(0xFF, 0xFF, 0xFF, 9), Color32::from_rgba_unmultiplied(0xFF, 0xFF, 0xFF, 18))
+    } else {
+        (Color32::from_rgba_unmultiplied(0x10, 0x18, 0x20, 8), Color32::from_rgba_unmultiplied(0x10, 0x18, 0x20, 22))
+    }
+}
+
+/// Paint a pill behind `rect` at the shape slot `slot` (reserved before the content was drawn).
+fn paint_pill(ui: &Ui, slot: egui::layers::ShapeIdx, rect: Rect) {
+    let t = Tokens::get(ui.ctx());
+    let (fill, edge) = pill_colors(&t);
+    let shape = egui::epaint::RectShape::new(rect, CornerRadius::same(11), fill, Stroke::new(1.0, edge), egui::StrokeKind::Inside);
+    ui.painter().set(slot, shape);
+}
+
+fn pill_rows_id() -> egui::Id {
+    egui::Id::new("nider_pill_rows")
+}
 // #653: a two-line label ends inside the content, above the group title row.
 const _: () = assert!(BIG_LABEL_Y + LABEL_PITCH + LABEL_LINE_H <= CONTENT_H);
 const _: () = assert!(BIG_ICON_Y + 16.0 <= BIG_LABEL_Y);
@@ -247,6 +277,30 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
     let t = Tokens::get(ui.ctx());
     let galley_w =
         label.split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
+    if PILLS {
+        // Model B: the large button is a small one; its label is the tooltip.
+        let (r, resp) = ui.allocate_exact_size(vec2(PILL_BUTTON + 2.0, PILL_BUTTON), Sense::click());
+        keytip_badge(ui, r, id, &label.replace('\n', " "));
+        let on = enabled(app, id);
+        bg(ui, r, &resp, checked, &t);
+        let (c, a) = if on { (t.icon, t.accent) } else { (t.text_disabled, t.text_disabled) };
+        let ic = if menu {
+            Rect::from_center_size(r.center() - vec2(3.0, 0.0), vec2(17.0, 17.0))
+        } else {
+            Rect::from_center_size(r.center(), vec2(17.0, 17.0))
+        };
+        icons::paint(ui.painter(), ic, icon, c, a);
+        if menu {
+            icons::paint(ui.painter(), Rect::from_center_size(pos2(r.max.x - 5.0, r.center().y), vec2(8.0, 8.0)), "dropdown", c, c);
+        }
+        let resp = tooltip(app, resp, &label.replace('\n', " "), id);
+        command_menu(&resp, app, id);
+        if resp.clicked() && on && !menu {
+            run_from_ribbon(app, id, params);
+        }
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, label.replace('\n', " ")));
+        return resp;
+    }
     let w = (galley_w + 12.0).max(44.0);
     let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
     keytip_badge(ui, r, id, &label.replace('\n', " "));
@@ -276,7 +330,7 @@ pub fn small(ui: &mut Ui, app: &mut WordApp, icon: &str, label: Option<&str>, ti
     let label = label.filter(|_| !crate::ribbon_fit::compact(ui.ctx()));
     let t = Tokens::get(ui.ctx());
     let text_w = label.map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x) + 6.0).unwrap_or(0.0);
-    let (r, resp) = ui.allocate_exact_size(vec2(24.0 + text_w, 22.0), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(24.0 + text_w, if PILLS { PILL_BUTTON } else { 22.0 }), Sense::click());
     keytip_badge(ui, r, id, tip);
     let on = enabled(app, id);
     bg(ui, r, &resp, checked, &t);
@@ -309,9 +363,10 @@ pub fn split(
 ) {
     let tip = tl!(tip);
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(24.0, 22.0), Sense::click());
+    let h = if PILLS { PILL_BUTTON } else { 22.0 };
+    let (r, resp) = ui.allocate_exact_size(vec2(24.0, h), Sense::click());
     keytip_badge(ui, r, id, tip);
-    let (ar, aresp) = ui.allocate_exact_size(vec2(11.0, 22.0), Sense::click());
+    let (ar, aresp) = ui.allocate_exact_size(vec2(11.0, h), Sense::click());
     let on = enabled(app, id);
     bg(ui, r, &resp, checked, &t);
     bg(ui, ar, &aresp, false, &t);
@@ -363,6 +418,8 @@ pub fn menu_button(
     // disabled the button greys out and doesn't open, like the other ribbon buttons. "" = always on.
     let on = menu_enabled(app, id);
     let (c, a, text) = if on { (t.icon, t.accent, t.text) } else { (t.text_disabled, t.text_disabled, t.text_disabled) };
+    let big_btn = big_btn && !PILLS;
+    let label = if PILLS { None } else { label };
     let resp = if big_btn {
         let galley_w = label
             .unwrap_or("")
@@ -383,7 +440,7 @@ pub fn menu_button(
         resp
     } else {
         let text_w = label.map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x) + 6.0).unwrap_or(0.0);
-        let (r, resp) = ui.allocate_exact_size(vec2(24.0 + text_w + 10.0, 22.0), Sense::click());
+        let (r, resp) = ui.allocate_exact_size(vec2(24.0 + text_w + 10.0, if PILLS { PILL_BUTTON } else { 22.0 }), Sense::click());
         keytip_badge(ui, r, "menu", tip);
         bg(ui, r, &resp, false, &t);
         icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(17.0, 17.0)), icon, c, a);
@@ -421,6 +478,9 @@ pub fn group(ui: &mut Ui, title: &str, launcher: Option<&str>, app: &mut WordApp
 
 /// A ribbon group whose title is shown as is (a custom group's name, Customize Ribbon).
 pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&str>, app: &mut WordApp, add: impl FnOnce(&mut Ui, &mut WordApp)) {
+    if PILLS {
+        return pill_group(ui, id_title, title, launcher, app, add);
+    }
     let t = Tokens::get(ui.ctx());
     let start = ui.cursor().min;
     // #662: the window may be too narrow for the tab; the plan says how this group fits.
@@ -462,6 +522,78 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
     ui.painter().line_segment([pos2(x, start.y + 4.0), pos2(x, start.y + CONTENT_H + LABEL_H - 4.0)], Stroke::new(1.0, t.border));
     ui.add_space(6.0);
     crate::ribbon_fit::record(ui.ctx(), id_title, level, ui.cursor().min.x - start.x);
+}
+
+/// Model B: a group is a glass pill holding its buttons in one row, the group's name in small
+/// capitals at its start. A group made of rows ([`row`]: Font, Paragraph) shows each row as its own
+/// pill instead and no name. The group moves to the next line when it doesn't fit (its width is the
+/// one it had last frame), and its dialog launcher is the last button.
+fn pill_group(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&str>, app: &mut WordApp, add: impl FnOnce(&mut Ui, &mut WordApp)) {
+    let t = Tokens::get(ui.ctx());
+    let width_id = egui::Id::new(("nider_pill_w", id_title));
+    let last_w = ui.data(|d| d.get_temp::<f32>(width_id)).unwrap_or(0.0);
+    if ui.cursor().min.x > ui.max_rect().min.x + 1.0 && ui.cursor().min.x + last_w > ui.max_rect().max.x {
+        ui.end_row();
+    }
+    let rows_before = ui.data(|d| d.get_temp::<usize>(pill_rows_id())).unwrap_or(0);
+    let slot = ui.painter().add(egui::Shape::Noop);
+    // The name in small capitals: "Clipboard" reads as Paste, as in model B; Font and Paragraph are
+    // plain from their buttons.
+    let name = match id_title {
+        "Font" | "Paragraph" => None,
+        "Clipboard" => Some(tl!("Paste").to_uppercase()),
+        _ => Some(title.to_uppercase()),
+    };
+    let start = ui.cursor().min.x;
+    // The wrapping row places a child by the size it asks for: ask for what is left of the line
+    // (more would push the group onto a line of its own); the line was ended above if that's short.
+    let ask = (ui.max_rect().max.x - ui.cursor().min.x).max(1.0);
+    let inner = ui.allocate_ui_with_layout(vec2(ask, PILL_H), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        ui.set_height(PILL_H);
+        ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+        if let Some(n) = &name {
+            ui.add_space(10.0);
+            ui.label(egui::RichText::new(n).font(crate::theme::semibold(9.5)).color(t.group_label).extra_letter_spacing(1.2));
+            ui.add_space(6.0);
+        } else {
+            ui.add_space(4.0);
+        }
+        crate::ribbon_fit::set_compact(ui.ctx(), true);
+        add(ui, app);
+        crate::ribbon_fit::end_compact(ui.ctx());
+        if let Some(cmd) = launcher {
+            let in_rows = ui.data(|d| d.get_temp::<usize>(pill_rows_id())).unwrap_or(0) != rows_before;
+            if in_rows {
+                let slot = ui.painter().add(egui::Shape::Noop);
+                let (lr, resp) = ui.allocate_exact_size(vec2(26.0, PILL_H), Sense::click());
+                paint_pill(ui, slot, lr);
+                if resp.hovered() {
+                    ui.painter().rect_filled(lr.shrink(3.0), 8.0, t.hover);
+                }
+                icons::paint(ui.painter(), Rect::from_center_size(lr.center(), vec2(10.0, 10.0)), "launcher", t.text_dim, t.accent);
+                if resp.on_hover_text(crate::i18n::fmt(tl!("{group} settings"), &[("group", title)])).clicked() {
+                    let _ = app.run(cmd, serde_json::json!({}));
+                }
+                return;
+            }
+            let (lr, resp) = ui.allocate_exact_size(vec2(18.0, PILL_BUTTON), Sense::click());
+            if resp.hovered() {
+                ui.painter().rect_filled(lr, 4.0, t.hover);
+            }
+            icons::paint(ui.painter(), Rect::from_center_size(lr.center(), vec2(10.0, 10.0)), "launcher", t.text_dim, t.accent);
+            if resp.on_hover_text(crate::i18n::fmt(tl!("{group} settings"), &[("group", title)])).clicked() {
+                let _ = app.run(cmd, serde_json::json!({}));
+            }
+        }
+        ui.add_space(6.0);
+    });
+    let rows_after = ui.data(|d| d.get_temp::<usize>(pill_rows_id())).unwrap_or(0);
+    let r = inner.response.rect;
+    if rows_after == rows_before {
+        paint_pill(ui, slot, Rect::from_min_max(pos2(r.min.x, r.center().y - PILL_H / 2.0), pos2(r.max.x, r.center().y + PILL_H / 2.0)));
+    }
+    ui.data_mut(|d| d.insert_temp(width_id, ui.cursor().min.x - start + 8.0));
+    ui.add_space(8.0);
 }
 
 /// A group's title row (`r`): the centred title and, with a `launcher`, its dialog launcher.
@@ -640,6 +772,25 @@ pub fn customize_menu_items(ui: &mut Ui, app: &mut WordApp) {
 
 /// A row of small buttons (used inside a vertical stack).
 pub fn row(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    if PILLS {
+        // Model B: each row of a group (Font: the font fields, then the character buttons) is a pill.
+        let slot = ui.painter().add(egui::Shape::Noop);
+        let inner = ui.allocate_ui_with_layout(vec2(ui.available_width().max(1.0), PILL_H), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.set_height(PILL_H);
+            ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+            ui.add_space(6.0);
+            add(ui);
+            ui.add_space(6.0);
+        });
+        let r = inner.response.rect;
+        paint_pill(ui, slot, Rect::from_min_max(pos2(r.min.x, r.center().y - PILL_H / 2.0), pos2(r.max.x, r.center().y + PILL_H / 2.0)));
+        ui.data_mut(|d| {
+            let n = d.get_temp::<usize>(pill_rows_id()).unwrap_or(0);
+            d.insert_temp(pill_rows_id(), n.saturating_add(1));
+        });
+        ui.add_space(6.0);
+        return;
+    }
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
         add(ui);
@@ -1242,9 +1393,18 @@ fn icon_text_button_with(ui: &mut Ui, icon: &str, text: &str, font: egui::FontId
     let size = vec2(icon_text_button_size(ui, text_w, marker, show_text), galley.size().y.max(icon_w) + 2.0 * pad.y);
     let (r, resp) = ui.allocate_exact_size(size, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), text));
-    let st = drawn_state(ui, &resp, true);
+    let mut st = drawn_state(ui, &resp, true);
     let r = r.expand(st.expansion);
-    ui.painter().rect(r, ui.visuals().widgets.inactive.corner_radius, st.fill, st.stroke, egui::StrokeKind::Inside);
+    if PILLS {
+        // Model B: a glass pill.
+        let (fill, edge) = pill_colors(&t);
+        st.fill = if resp.hovered() { t.hover } else { fill };
+        st.stroke = Stroke::new(1.0, edge);
+        st.text = t.text;
+        ui.painter().rect(r, CornerRadius::same(11), st.fill, st.stroke, egui::StrokeKind::Inside);
+    } else {
+        ui.painter().rect(r, ui.visuals().widgets.inactive.corner_radius, st.fill, st.stroke, egui::StrokeKind::Inside);
+    }
     icons::paint(
         ui.painter(),
         Rect::from_center_size(pos2(r.min.x + pad.x + icon_w / 2.0, r.center().y), vec2(icon_w, icon_w)),
