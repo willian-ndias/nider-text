@@ -6645,11 +6645,12 @@ mod tests {
     }
 
     /// #115: the old dark-mode switch migrates to Light/Dark; a saved System stays System, and the
-    /// old key is never written back.
+    /// old key is never written back. Nider: with nothing saved the default is Dark (the brand's
+    /// graphite glass).
     #[test]
     fn interface_theme_migrates_and_survives_a_restart() {
         use theme::Appearance;
-        for (saved, want) in [(r#"{"dark": false}"#, Appearance::Light), (r#"{"dark": true}"#, Appearance::Dark), ("{}", Appearance::System)] {
+        for (saved, want) in [(r#"{"dark": false}"#, Appearance::Light), (r#"{"dark": true}"#, Appearance::Dark), ("{}", Appearance::Dark)] {
             let mut a = app();
             a.apply_prefs(serde_json::from_str(saved).unwrap());
             assert_eq!(a.ui.theme, want, "{saved}");
@@ -6663,7 +6664,7 @@ mod tests {
         assert_eq!(b.ui.theme, Appearance::System);
         // An unknown saved value keeps the rest of the preferences.
         let odd: UiState = serde_json::from_str(r#"{"theme": "sepia", "tab": "Insert"}"#).unwrap();
-        assert_eq!((odd.theme, odd.tab.as_str()), (Appearance::System, "Insert"));
+        assert_eq!((odd.theme, odd.tab.as_str()), (Appearance::Dark, "Insert"));
     }
 
     /// #1861: the registered Interface Theme command drives the same setting as Options:

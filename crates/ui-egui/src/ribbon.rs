@@ -299,7 +299,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     // Nider "Vidro": the tab strip and the ribbon are one rounded glass card on the backdrop.
     let ribbon_shown = !app.ui.ribbon_collapsed;
     let bottom_corners = if ribbon_shown { 0 } else { 18 };
-    egui::Panel::top("tabs")
+    let tabs = egui::Panel::top("tabs")
         .exact_size(40.0)
         .frame(
             egui::Frame::NONE
@@ -483,6 +483,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 });
             });
         });
+    // The tab card (the panel minus its 16-point side margins) gets the glass highlight on top.
+    let card = egui::Rect::from_min_max(tabs.response.rect.min + egui::vec2(16.0, 0.0), tabs.response.rect.max - egui::vec2(16.0, 0.0));
+    crate::theme::glass_sheen(&ui.ctx().layer_painter(tabs.response.layer_id), card, 18.0, &t);
     if app.ui.ribbon_collapsed {
         return;
     }

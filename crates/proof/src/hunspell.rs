@@ -1,13 +1,14 @@
 //! Hunspell dictionaries installed on the system, read at runtime.
 //!
-//! WordCraft doesn't bundle large spelling dictionaries. For languages with an affix dictionary
+//! WordCraft doesn't bundle large spelling dictionaries in the program itself; the Nider Text
+//! installer adds the Brazilian Portuguese one (VERO, MPL-2.0) in `dictionaries/` next to it. For languages with an affix dictionary
 //! (Polish, Russian), it reads the standard Hunspell `.aff`/`.dic` pair installed by the operating system,
 //! a package manager or LibreOffice, with [`crate::affix::AffixDict::from_hunspell`]. When none is
 //! installed the language has no spelling check (no marks, no errors), like Word without the
 //! language's proofing tools.
 //!
-//! Search order: the directory in `WORDCRAFT_DICTIONARIES` (or one set with
-//! [`set_dictionary_dir`]), then the usual system locations. On the web there are none.
+//! Search order: the directory set with [`set_dictionary_dir`], `WORDCRAFT_DICTIONARIES`,
+//! `dictionaries/` next to the program, then the usual system locations. On the web there are none.
 
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -75,6 +76,11 @@ pub fn search_dirs(lo_exts: Option<&[String]>) -> Vec<PathBuf> {
     }
     if let Some(d) = std::env::var_os("WORDCRAFT_DICTIONARIES").filter(|v| !v.is_empty()) {
         dirs.push(PathBuf::from(d));
+    }
+    // Nider: the dictionaries the installer ships (Brazilian Portuguese, VERO) sit in a
+    // `dictionaries` folder next to the program, so spelling works with nothing to set up.
+    if let Some(dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|p| p.join("dictionaries"))) {
+        dirs.push(dir);
     }
     // LibreOffice keeps each language under `…/share/extensions/<dict-xx>`.
     let lo_dirs =

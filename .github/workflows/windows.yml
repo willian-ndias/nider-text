@@ -2,11 +2,20 @@ name: Nider Text para Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      versao:
+        description: "Publicar esta versão (ex.: 1.2.3-beta). Vazio = só compilar, sem publicar."
+        required: false
+        default: ""
   push:
     tags: ["v*"]
 
 permissions:
   contents: write
+
+env:
+  # A versão a publicar: a da etiqueta (push de tag) ou a digitada no "Run workflow".
+  PUBLICAR: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (github.event.inputs.versao != '' && format('v{0}', github.event.inputs.versao) || '') }}
 
 jobs:
   windows:
@@ -34,9 +43,9 @@ jobs:
         with:
           key: nider-text-windows-x64
       - name: Aplicar a versão da etiqueta
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.PUBLICAR != ''
         shell: bash
-        run: cargo xtask version set "${GITHUB_REF_NAME#v}"
+        run: cargo xtask version set "${PUBLICAR#v}"
       - name: Instalar WiX
         shell: pwsh
         run: |
@@ -75,10 +84,10 @@ jobs:
           path: dist/release/*
           if-no-files-found: error
       - name: Notas da versão (o que mudou desde a versão anterior)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: env.PUBLICAR != '' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
-          atual="${GITHUB_REF_NAME}"
+          atual="${PUBLICAR:-$GITHUB_REF_NAME}"
           git rev-parse -q --verify "refs/tags/$atual" >/dev/null || atual="HEAD"
           anterior=$(git describe --tags --abbrev=0 --match 'v*' "$atual^" 2>/dev/null || true)
           {
@@ -91,11 +100,11 @@ jobs:
           } > notas.md
           cat notas.md
       - name: Publicar versão no GitHub
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.PUBLICAR != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME}"
-          gh release create "$tag" dist/release/nider-text-* --title "Nider Text $tag" --prerelease \
+          tag="${PUBLICAR#vv}"; tag="v${tag#v}"
+          gh release create "$tag" --target "$GITHUB_SHA" dist/release/nider-text-* --title "Nider Text $tag" --prerelease \
             --notes-file notas.md

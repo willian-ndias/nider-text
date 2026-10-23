@@ -20,8 +20,10 @@ pub const APP_INK: Color32 = Color32::from_rgb(0x1B, 0x7F, 0xB0);
 #[serde(from = "String", into = "String")]
 pub enum Appearance {
     Light,
-    Dark,
+    /// Nider: the graphite glass look is the default (the brand's own); Light and System are one
+    /// click away (the title bar's theme button, File › Options).
     #[default]
+    Dark,
     System,
 }
 
@@ -450,9 +452,12 @@ impl Tokens {
             on_close: Color32::WHITE,
             backdrop_top: Color32::from_rgb(0x14, 0x18, 0x20),
             backdrop_bottom: Color32::from_rgb(0x07, 0x09, 0x0C),
-            glow: Color32::from_rgb(0x0F, 0x2A, 0x30),
-            glass: Color32::from_rgb(0x16, 0x1A, 0x21),
-            glass_edge: Color32::from_rgb(0x2E, 0x34, 0x3D),
+            // The app's cyan, faded in `paint_backdrop`'s glow.
+            glow: Color32::from_rgb(0x22, 0xD3, 0xEE),
+            // Real glass (Nider Terminal, Titânio): a silver tint over the backdrop and a silver
+            // edge, with `glass_sheen`'s highlight along the top.
+            glass: Color32::from_rgba_unmultiplied(0xDC, 0xE4, 0xEC, 20),
+            glass_edge: Color32::from_rgba_unmultiplied(0xE1, 0xE8, 0xF0, 46),
             pill: Color32::from_rgb(0xD9, 0xDE, 0xE4),
             pill_text: Color32::from_rgb(0x07, 0x09, 0x0C),
         }
@@ -462,16 +467,81 @@ impl Tokens {
     }
 }
 
-/// Paints the Vidro backdrop behind every panel: the vertical gradient, with the app's colour
-/// glowing softly at the top left.
+/// Paints the Vidro backdrop behind every panel: the vertical gradient and two soft glows, as on
+/// the Nider Terminal — the app's colour at the top left, silver at the top right.
 pub fn paint_backdrop(ctx: &egui::Context) {
     let t = Tokens::get(ctx);
     let rect = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::background());
     let mut mesh = egui::Mesh::default();
-    let top_left = t.backdrop_top.lerp_to_gamma(t.glow, 0.85);
-    let corners = [(rect.left_top(), top_left), (rect.right_top(), t.backdrop_top), (rect.right_bottom(), t.backdrop_bottom), (rect.left_bottom(), t.backdrop_bottom)];
+    let corners = [
+        (rect.left_top(), t.backdrop_top),
+        (rect.right_top(), t.backdrop_top),
+        (rect.right_bottom(), t.backdrop_bottom),
+        (rect.left_bottom(), t.backdrop_bottom),
+    ];
     for (pos, color) in corners {
+        mesh.colored_vertex(pos, color);
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(egui::Shape::mesh(mesh));
+    glow(
+        &painter,
+        rect.left_top() + egui::vec2(rect.width() * 0.16, -rect.height() * 0.06),
+        egui::vec2(rect.width() * 0.55, rect.height() * 0.62),
+        t.glow,
+        if t.dark { 55 } else { 90 },
+    );
+    if t.dark {
+        glow(
+            &painter,
+            rect.right_top() + egui::vec2(-rect.width() * 0.18, -rect.height() * 0.08),
+            egui::vec2(rect.width() * 0.5, rect.height() * 0.5),
+            Color32::from_rgb(0xD9, 0xDE, 0xE4),
+            22,
+        );
+    }
+}
+
+/// A radial glow: `color` at `alpha` in the middle, fading to nothing at the ellipse `radius`.
+fn glow(painter: &egui::Painter, center: egui::Pos2, radius: egui::Vec2, color: Color32, alpha: u8) {
+    if alpha == 0 || radius.x <= 0.0 || radius.y <= 0.0 {
+        return;
+    }
+    const STEPS: u32 = 48;
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(center, Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha));
+    for i in 0..=STEPS {
+        let a = std::f32::consts::TAU * i as f32 / STEPS as f32;
+        mesh.colored_vertex(center + egui::vec2(a.cos() * radius.x, a.sin() * radius.y), Color32::TRANSPARENT);
+    }
+    for i in 1..=STEPS {
+        mesh.add_triangle(0, i, i + 1);
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+/// The glass highlight on a card (`rect`, corner `radius`): a bright hairline along the top edge
+/// and a faint wash fading down from it — what makes the Terminal's cards read as glass.
+pub fn glass_sheen(painter: &egui::Painter, rect: egui::Rect, radius: f32, t: &Tokens) {
+    if rect.width() <= 2.0 * radius || rect.height() <= 4.0 {
+        return;
+    }
+    let (line, wash) = if t.dark { (70, 12) } else { (230, 70) };
+    painter.line_segment(
+        [egui::pos2(rect.left() + radius, rect.top() + 0.5), egui::pos2(rect.right() - radius, rect.top() + 0.5)],
+        egui::Stroke::new(1.0, Color32::from_white_alpha(line)),
+    );
+    let band = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + radius * 0.6, rect.top() + 1.0),
+        egui::pos2(rect.right() - radius * 0.6, rect.top() + (rect.height() * 0.35).min(30.0)),
+    );
+    let mut mesh = egui::Mesh::default();
+    let top = Color32::from_white_alpha(wash);
+    for (pos, color) in
+        [(band.left_top(), top), (band.right_top(), top), (band.right_bottom(), Color32::TRANSPARENT), (band.left_bottom(), Color32::TRANSPARENT)]
+    {
         mesh.colored_vertex(pos, color);
     }
     mesh.add_triangle(0, 1, 2);
