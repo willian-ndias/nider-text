@@ -119,6 +119,11 @@ foreach ($file in 'LICENSE-MIT', 'LICENSE-APACHE') {
     $title = $false
   }
 }
+# Nider: Brazilian Portuguese spelling (VERO, MPL-2.0) staged as dictionaries\ beside the program;
+# the MSI (wordcraft.wxs, DICTFOLDER) and the portable zip both take it from here.
+$StageDicts = Join-Path $Stage 'dictionaries'
+New-Item -ItemType Directory -Force -Path $StageDicts | Out-Null
+Copy-Item (Join-Path $Root 'assets\spelling\pt_BR\*') $StageDicts
 $LicenseRtf = Join-Path $Stage 'license.rtf'
 $rtf = '{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fswiss\fcharset0 Tahoma;}}\viewkind4\uc1\pard\sa120\f0\fs16 ' +
   ($paragraphs -join "\par`r`n") + "\par`r`n}`r`n"
@@ -155,7 +160,7 @@ if ($env:CRAFT_FONTS_DIR) {
 # which the spell checker searches (crates/proof/src/hunspell.rs) — spelling works out of the box.
 $Dicts = Join-Path $Portable 'dictionaries'
 New-Item -ItemType Directory -Force -Path $Dicts | Out-Null
-Copy-Item (Join-Path $Root 'assets\spelling\pt_BR\*') $Dicts
+Copy-Item (Join-Path $StageDicts '*') $Dicts
 $Zip = Join-Path $Dist "wordcraft-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $Portable -DestinationPath $Zip
