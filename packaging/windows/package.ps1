@@ -151,6 +151,11 @@ if ($env:CRAFT_FONTS_DIR) {
     Copy-Item $ofl.FullName (Join-Path $Portable "OFL-$($ofl.Directory.Name).txt")
   }
 }
+# Nider: Brazilian Portuguese spelling (VERO, MPL-2.0) in dictionaries\ next to the program,
+# which the spell checker searches (crates/proof/src/hunspell.rs) — spelling works out of the box.
+$Dicts = Join-Path $Portable 'dictionaries'
+New-Item -ItemType Directory -Force -Path $Dicts | Out-Null
+Copy-Item (Join-Path $Root 'assets\spelling\pt_BR\*') $Dicts
 $Zip = Join-Path $Dist "wordcraft-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $Portable -DestinationPath $Zip

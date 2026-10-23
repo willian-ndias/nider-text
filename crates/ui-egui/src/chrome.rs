@@ -4,7 +4,7 @@ use egui::{Align2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use serde_json::json;
 use wordcraft_doc::StoryRef;
 
-use crate::theme::{Tokens, TypeRung, medium, paint_text, regular, semibold, text_width};
+use crate::theme::{Tokens, TypeRung, paint_text, regular, semibold, text_width};
 use crate::{WordApp, icons};
 
 /// The Quick Access Toolbar's button for command `id`.
@@ -305,6 +305,40 @@ pub fn brand(ui: &mut Ui, size: f32, ink: egui::Color32, accent: egui::Color32) 
     ui.label(egui::RichText::new("TEXT").font(font).color(accent).extra_letter_spacing(1.2));
 }
 
+/// The theme button's glyph, drawn with lines: a monitor (System), a sun (Light), a moon (Dark).
+fn theme_glyph(p: &egui::Painter, r: Rect, theme: crate::theme::Appearance, c: egui::Color32) {
+    let s = Stroke::new(1.5, c);
+    let o = r.center();
+    match theme {
+        crate::theme::Appearance::System => {
+            p.rect_stroke(Rect::from_center_size(o - vec2(0.0, 1.5), vec2(14.0, 9.5)), 1.5, s, egui::StrokeKind::Middle);
+            p.line_segment([o + vec2(-3.5, 6.0), o + vec2(3.5, 6.0)], s);
+        }
+        crate::theme::Appearance::Light => {
+            p.circle_stroke(o, 3.4, s);
+            for i in 0..8 {
+                let a = std::f32::consts::TAU * i as f32 / 8.0;
+                let d = vec2(a.cos(), a.sin());
+                p.line_segment([o + d * 5.6, o + d * 7.6], s);
+            }
+        }
+        crate::theme::Appearance::Dark => {
+            // A crescent: the disc minus an offset disc, drawn as an arc of points.
+            let pts: Vec<egui::Pos2> = (0..=24)
+                .map(|i| {
+                    let a = std::f32::consts::PI * (0.25 + 1.5 * i as f32 / 24.0);
+                    o + vec2(a.cos(), a.sin()) * 6.5
+                })
+                .chain((0..=24).map(|i| {
+                    let a = std::f32::consts::PI * (1.75 - 1.5 * i as f32 / 24.0);
+                    o + vec2(2.6, -1.6) + vec2(a.cos(), a.sin()) * 5.0
+                }))
+                .collect();
+            p.add(egui::Shape::closed_line(pts, s));
+        }
+    }
+}
+
 pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     // macOS: shorter, so the system's traffic lights are centred in it; the tallest controls
@@ -393,6 +427,23 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                         });
                         ui.add_space(crate::window_controls::SIDE_GAP);
                     }
+                    // Display theme (as in Nider PDF): a click cycles System, Light, Dark.
+                    let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
+                    if resp.hovered() {
+                        ui.painter().rect_filled(r, 6.0, t.hover);
+                    }
+                    theme_glyph(ui.painter(), r, app.ui.theme, t.icon);
+                    let tip = format!("{} {}", tl!("Interface theme:"), tl!(app.ui.theme.label()));
+                    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &tip));
+                    if resp.on_hover_text(tip.clone()).clicked() {
+                        let next = match app.ui.theme {
+                            crate::theme::Appearance::System => "light",
+                            crate::theme::Appearance::Light => "dark",
+                            crate::theme::Appearance::Dark => "system",
+                        };
+                        let _ = app.run("ui.theme", json!({"value": next}));
+                    }
+                    ui.add_space(6.0);
                     // Account / community.
                     let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
                     ui.painter().circle_filled(r.center(), control_h / 2.0 - 1.0, t.accent);

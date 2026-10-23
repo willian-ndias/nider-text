@@ -153,6 +153,12 @@
       <Component Id="WordcraftCli">
         <File Id="WordcraftCliExe" Source="$(var.BinDir)\wordcraft-cli.exe" KeyPath="yes" />
       </Component>
+      <!-- Nider: Brazilian Portuguese spelling (VERO, MPL-2.0) beside the program. -->
+      <Component Id="WordcraftDictPtBr" Subdirectory="dictionaries">
+        <File Id="DictPtBrAff" Source="$(sys.SOURCEFILEDIR)..\..\assets\spelling\pt_BR\pt_BR.aff" KeyPath="yes" />
+        <File Id="DictPtBrDic" Source="$(sys.SOURCEFILEDIR)..\..\assets\spelling\pt_BR\pt_BR.dic" />
+        <File Id="DictPtBrLicense" Source="$(sys.SOURCEFILEDIR)..\..\assets\spelling\pt_BR\LICENSE-VERO.txt" />
+      </Component>
     </ComponentGroup>
   </Fragment>
 </Wix>

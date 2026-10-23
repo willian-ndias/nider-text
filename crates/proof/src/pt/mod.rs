@@ -121,6 +121,27 @@ fn known(d: &AffixDict, w: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// Nider: the Brazilian Portuguese dictionary the Windows installer ships
+    /// (assets/spelling/pt_BR, VERO) loads with the affix reader and checks real text.
+    #[test]
+    fn shipped_vero_dictionary_checks_brazilian_portuguese() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/spelling/pt_BR");
+        let d = crate::hunspell::load(&dir.join("pt_BR.aff"), &dir.join("pt_BR.dic")).expect("the shipped pt_BR dictionary loads");
+        for w in ["casa", "batata", "amassada", "funções", "solicitadas", "coração", "manual"] {
+            assert!(d.check(w), "{w} is a word");
+        }
+        for w in ["amszada", "funsões", "caza"] {
+            assert!(!d.check(w), "{w} is flagged");
+        }
+    }
+
+    /// Nider: `dictionaries/` next to the program is searched, after the user's folder.
+    #[test]
+    fn the_folder_next_to_the_program_is_searched() {
+        let dirs = crate::hunspell::search_dirs(None);
+        assert!(dirs.iter().any(|d| d.ends_with("dictionaries")), "{dirs:?}");
+    }
+
     use super::*;
 
     #[test]
