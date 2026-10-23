@@ -1,4 +1,7 @@
-//! Nider: ao abrir, pergunta ao site Nider se há versão nova do Nider Text e mostra um aviso.
+//! Nider: as mesmas regras do Nider Etapas. Ao abrir, pergunta ao site Nider se há versão nova e,
+//! havendo, o aviso pergunta Baixar / Depois. Com o programa aberto, olha de novo a cada 4 horas:
+//! aí só acende o botão de atualização na barra de título (clicar nele pergunta de novo). Nada é
+//! baixado antes do Baixar; durante o download a seta desce e mostra a porcentagem.
 //!
 //! A consulta roda numa thread à parte (não trava a abertura) com o `curl` do sistema, que vem
 //! no Windows 10 e 11: assim o app não ganha dependência nova de rede. Sem internet, ou com
@@ -20,9 +23,27 @@ struct Nova {
 }
 
 static ESTADO: OnceLock<Mutex<Option<Nova>>> = OnceLock::new();
-static FECHADO: AtomicBool = AtomicBool::new(false);
-/// "Atualizar agora" clicado: o instalador está sendo baixado.
+/// O aviso está fechado: começa fechado e só abre na consulta ao abrir o programa (ou pelo botão
+/// da barra de título).
+static FECHADO: AtomicBool = AtomicBool::new(true);
+/// "Baixar" clicado: o instalador está sendo baixado.
 static BAIXANDO: AtomicBool = AtomicBool::new(false);
+/// Quanto do instalador já chegou, 0–100; acima disso, ainda não se sabe o tamanho.
+static PORCENTO: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(u8::MAX);
+
+/// Com o programa aberto, olha de novo a cada 4 horas (como no Nider Etapas).
+const DE_NOVO: std::time::Duration = std::time::Duration::from_secs(4 * 60 * 60);
+
+/// O último `Content-Length` do arquivo de cabeçalhos do curl (depois dos redirecionamentos).
+fn tamanho(cabecalhos: &std::path::Path) -> Option<u64> {
+    let texto = std::fs::read_to_string(cabecalhos).ok()?;
+    texto
+        .lines()
+        .rev()
+        .filter_map(|l| l.split_once(':'))
+        .filter(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
+        .find_map(|(_, v)| v.trim().parse::<u64>().ok())
+}
 static ERRO: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
 fn erro(msg: Option<String>) {
@@ -40,17 +61,38 @@ fn atualizar(ctx: egui::Context, versao: String, link: String) {
         let resultado = (|| -> Result<(), String> {
             let nome: String = versao.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '.' || *c == '-').take(40).collect();
             let destino = std::env::temp_dir().join(format!("nider-text-setup-{nome}.exe"));
+            let cabecalhos = std::env::temp_dir().join(format!("nider-text-setup-{nome}.headers"));
+            let _ = std::fs::remove_file(&destino);
             let mut cmd = std::process::Command::new("curl");
-            cmd.args(["-s", "-f", "-L", "-m", "900", "-o"]).arg(&destino).arg(&link);
+            cmd.args(["-s", "-f", "-L", "-m", "900", "-D"]).arg(&cabecalhos).arg("-o").arg(&destino).arg(&link);
             #[cfg(windows)]
             {
                 use std::os::windows::process::CommandExt;
                 cmd.creation_flags(0x0800_0000);
             }
-            let ok = cmd.status().map(|s| s.success()).unwrap_or(false);
+            let falhou = || "Não consegui baixar a versão nova. Confira a internet e tente de novo.".to_string();
+            let mut filho = cmd.spawn().map_err(|_| falhou())?;
+            // Enquanto baixa: a porcentagem, pelo tamanho do arquivo contra o que o site informou.
+            let ok = loop {
+                match filho.try_wait() {
+                    Ok(Some(status)) => break status.success(),
+                    Ok(None) => {}
+                    Err(_) => break false,
+                }
+                if let (Some(total), Ok(meta)) = (tamanho(&cabecalhos), std::fs::metadata(&destino))
+                    && total > 0
+                {
+                    let p = (meta.len().saturating_mul(100) / total).min(99);
+                    PORCENTO.store(u8::try_from(p).unwrap_or(99), Ordering::Relaxed);
+                    ctx.request_repaint();
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            };
+            let _ = std::fs::remove_file(&cabecalhos);
             if !ok {
-                return Err("Não consegui baixar a versão nova. Confira a internet e tente de novo.".into());
+                return Err(falhou());
             }
+            PORCENTO.store(100, Ordering::Relaxed);
             // Só um instalador do Windows (começa com "MZ") é aberto.
             let mut cabeca = [0u8; 2];
             let lido = std::fs::File::open(&destino).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut cabeca));
@@ -67,20 +109,32 @@ fn atualizar(ctx: egui::Context, versao: String, link: String) {
             Err(e) => {
                 erro(Some(e));
                 BAIXANDO.store(false, Ordering::Relaxed);
+                PORCENTO.store(u8::MAX, Ordering::Relaxed);
             }
         }
         ctx.request_repaint();
     });
 }
 
-/// Começa a consulta em segundo plano.
+/// Começa as consultas em segundo plano: agora (o aviso pergunta) e a cada 4 horas (só o botão
+/// da barra de título acende).
 pub fn iniciar(ctx: egui::Context) {
     std::thread::spawn(move || {
-        if let Some(nova) = consultar() {
-            if let Ok(mut g) = ESTADO.get_or_init(|| Mutex::new(None)).lock() {
-                *g = Some(nova);
+        let mut primeira = true;
+        loop {
+            if !BAIXANDO.load(Ordering::Relaxed)
+                && let Some(nova) = consultar()
+            {
+                if let Ok(mut g) = ESTADO.get_or_init(|| Mutex::new(None)).lock() {
+                    *g = Some(nova);
+                }
+                if primeira {
+                    FECHADO.store(false, Ordering::Relaxed);
+                }
+                ctx.request_repaint();
             }
-            ctx.request_repaint();
+            primeira = false;
+            std::thread::sleep(DE_NOVO);
         }
     });
 }
@@ -134,27 +188,29 @@ fn mais_nova(publicada: &str, atual: &str) -> bool {
 
 /// Seta para baixo que desce e some, em ciclo, enquanto o instalador baixa.
 fn seta_baixando(ui: &mut egui::Ui, cor: egui::Color32) {
-    ui.ctx().request_repaint();
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(18.0, 22.0), egui::Sense::hover());
-    let fase = (ui.input(|i| i.time) * 1.5).fract() as f32;
-    let tinta = cor.gamma_multiply(1.0 - fase * 0.85);
-    let cx = rect.center().x;
-    let y = rect.top() + 3.0 + fase * (rect.height() - 12.0);
-    let p = ui.painter();
-    let traco = egui::Stroke::new(2.0, tinta);
-    p.line_segment([egui::pos2(cx, y - 5.0), egui::pos2(cx, y + 3.0)], traco);
-    p.line_segment([egui::pos2(cx - 4.5, y), egui::pos2(cx, y + 5.0)], traco);
-    p.line_segment([egui::pos2(cx + 4.5, y), egui::pos2(cx, y + 5.0)], traco);
+    wordcraft_ui_egui::chrome::down_arrow(ui, cor);
 }
 
-/// Desenha o aviso (a cada quadro) enquanto houver versão nova e a pessoa não tiver fechado.
+/// Desenha o aviso (a cada quadro) enquanto houver versão nova e a pessoa não tiver fechado, e
+/// conta à barra de título o que mostrar no botão de atualização
+/// (`wordcraft_ui_egui::chrome::UPDATE_BADGE`).
 pub fn mostrar(ctx: &egui::Context) {
-    if FECHADO.load(Ordering::Relaxed) {
-        return;
-    }
     let Some(nova) = ESTADO.get().and_then(|m| m.lock().ok()).and_then(|g| g.clone()) else {
         return;
     };
+    let badge = wordcraft_ui_egui::chrome::UpdateBadge {
+        versao: nova.versao.trim_start_matches(['v', 'V']).to_string(),
+        baixando: BAIXANDO.load(Ordering::Relaxed),
+        porcento: Some(PORCENTO.load(Ordering::Relaxed)).filter(|p| *p <= 100),
+    };
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(wordcraft_ui_egui::chrome::UPDATE_BADGE), badge));
+    // O botão da barra de título foi clicado: pergunta de novo.
+    if ctx.data_mut(|d| d.remove_temp::<bool>(egui::Id::new(wordcraft_ui_egui::chrome::UPDATE_ASK))).unwrap_or(false) {
+        FECHADO.store(false, Ordering::Relaxed);
+    }
+    if FECHADO.load(Ordering::Relaxed) {
+        return;
+    }
     let mut aberto = true;
     let mut fechar = false;
     egui::Window::new("Nova versão do Nider Text")
@@ -177,7 +233,8 @@ pub fn mostrar(ctx: &egui::Context) {
                 ui.horizontal(|ui| {
                     let cor = ui.visuals().text_color();
                     seta_baixando(ui, cor);
-                    ui.label("Baixando a versão nova… o Nider Text vai fechar, atualizar e abrir de novo.");
+                    let quanto = Some(PORCENTO.load(Ordering::Relaxed)).filter(|p| *p <= 100).map(|p| format!(" {p}%")).unwrap_or_default();
+                    ui.label(format!("Baixando a versão nova{quanto}… o Nider Text vai fechar, atualizar e abrir de novo."));
                 });
                 return;
             }
@@ -185,7 +242,8 @@ pub fn mostrar(ctx: &egui::Context) {
                 match &nova.download {
                     // Baixa e atualiza sozinho, sem passar pelo navegador.
                     Some(d) => {
-                        if ui.button("Atualizar agora").clicked() {
+                        // Como no Nider Etapas: nada é baixado antes do Baixar.
+                        if ui.button("Baixar").clicked() {
                             atualizar(ui.ctx().clone(), nova.versao.clone(), d.clone());
                         }
                     }
@@ -209,6 +267,16 @@ pub fn mostrar(ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// O tamanho que vale é o da última resposta (depois dos redirecionamentos).
+    #[test]
+    fn tamanho_le_o_ultimo_content_length() {
+        let f = std::env::temp_dir().join(format!("nider-text-headers-test-{}", std::process::id()));
+        std::fs::write(&f, "HTTP/1.1 302 Found\r\nContent-Length: 0\r\n\r\nHTTP/1.1 200 OK\r\ncontent-length: 1234\r\n\r\n").unwrap();
+        assert_eq!(tamanho(&f), Some(1234));
+        let _ = std::fs::remove_file(&f);
+        assert_eq!(tamanho(&f), None);
+    }
 
     #[test]
     fn compara_versoes_ignorando_sufixo() {

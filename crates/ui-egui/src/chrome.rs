@@ -305,6 +305,48 @@ pub fn brand(ui: &mut Ui, size: f32, ink: egui::Color32, accent: egui::Color32) 
     ui.label(egui::RichText::new("TEXT").font(font).color(accent).extra_letter_spacing(1.2));
 }
 
+/// Temp-data key: the update the desktop app found (`UpdateBadge`), shown as the title bar's
+/// update button (Nider, as in Nider Etapas).
+pub const UPDATE_BADGE: &str = "nider_update_badge";
+/// Temp-data key: the title bar's update button was clicked (the app asks Baixar / Depois again).
+pub const UPDATE_ASK: &str = "nider_update_ask";
+
+/// A newer version is known: its number, and the download under way with how far it is (0–100).
+#[derive(Clone, Debug, Default)]
+pub struct UpdateBadge {
+    pub versao: String,
+    pub baixando: bool,
+    pub porcento: Option<u8>,
+}
+
+/// A down arrow that runs down and fades, in a loop, while the installer downloads.
+pub fn down_arrow(ui: &mut Ui, cor: egui::Color32) {
+    ui.ctx().request_repaint();
+    let (rect, _) = ui.allocate_exact_size(vec2(18.0, 22.0), Sense::hover());
+    let fase = (ui.input(|i| i.time) * 1.5).fract() as f32;
+    let tinta = cor.gamma_multiply(1.0 - fase * 0.85);
+    let cx = rect.center().x;
+    let y = rect.top() + 3.0 + fase * (rect.height() - 12.0);
+    let p = ui.painter();
+    let traco = Stroke::new(2.0, tinta);
+    p.line_segment([pos2(cx, y - 5.0), pos2(cx, y + 3.0)], traco);
+    p.line_segment([pos2(cx - 4.5, y), pos2(cx, y + 5.0)], traco);
+    p.line_segment([pos2(cx + 4.5, y), pos2(cx, y + 5.0)], traco);
+}
+
+/// The update button: a still down arrow in a tray, with the app's dot.
+fn update_glyph(p: &egui::Painter, r: Rect, c: egui::Color32, dot: egui::Color32) {
+    let s = Stroke::new(1.6, c);
+    let o = r.center();
+    p.line_segment([o + vec2(0.0, -6.0), o + vec2(0.0, 2.5)], s);
+    p.line_segment([o + vec2(-3.8, -1.2), o + vec2(0.0, 2.8)], s);
+    p.line_segment([o + vec2(3.8, -1.2), o + vec2(0.0, 2.8)], s);
+    p.line_segment([o + vec2(-6.0, 3.5), o + vec2(-6.0, 6.0)], s);
+    p.line_segment([o + vec2(-6.0, 6.0), o + vec2(6.0, 6.0)], s);
+    p.line_segment([o + vec2(6.0, 6.0), o + vec2(6.0, 3.5)], s);
+    p.circle_filled(r.right_top() + vec2(-4.0, 4.0), 3.2, dot);
+}
+
 /// The theme button's glyph, drawn with lines: a monitor (System), a sun (Light), a moon (Dark).
 fn theme_glyph(p: &egui::Painter, r: Rect, theme: crate::theme::Appearance, c: egui::Color32) {
     let s = Stroke::new(1.5, c);
@@ -426,6 +468,28 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                             crate::window_controls::buttons(ui, &controls.right);
                         });
                         ui.add_space(crate::window_controls::SIDE_GAP);
+                    }
+                    // Nider (as in Nider Etapas): a newer version lights the update button; while
+                    // the installer downloads, the arrow runs down and the percentage shows.
+                    if let Some(b) = ui.ctx().data(|d| d.get_temp::<UpdateBadge>(egui::Id::new(UPDATE_BADGE))) {
+                        if b.baixando {
+                            if let Some(p) = b.porcento {
+                                ui.label(egui::RichText::new(format!("{p}%")).font(semibold(12.0)).color(t.accent_text));
+                            }
+                            down_arrow(ui, t.accent);
+                        } else {
+                            let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
+                            if resp.hovered() {
+                                ui.painter().rect_filled(r, 6.0, t.hover);
+                            }
+                            update_glyph(ui.painter(), r, t.icon, t.accent);
+                            let tip = format!("Nova versão {}. Clique para atualizar.", b.versao);
+                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &tip));
+                            if resp.on_hover_text(tip.clone()).clicked() {
+                                ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(UPDATE_ASK), true));
+                            }
+                        }
+                        ui.add_space(6.0);
                     }
                     // Display theme (as in Nider PDF): a click cycles System, Light, Dark.
                     let (r, resp) = ui.allocate_exact_size(vec2(control_h, control_h), Sense::click());
