@@ -30,6 +30,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # O Nider Terminal mostra "Compilando a versão …" enquanto existe a etiqueta sem instalador:
+      # com "Run workflow", a etiqueta nasce já aqui (empurrada pelo GITHUB_TOKEN, que não dispara
+      # outra compilação) em vez de só no fim, junto com a versão.
+      - name: Etiqueta no início (Nider Terminal mostra a compilação)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.versao != ''
+        shell: bash
+        run: |
+          tag="${PUBLICAR#vv}"; tag="v${tag#v}"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+          fi
       - name: Fontes do WordCraft (craft-fonts)
         uses: actions/checkout@v4
         with:
@@ -108,3 +120,12 @@ jobs:
           tag="${PUBLICAR#vv}"; tag="v${tag#v}"
           gh release create "$tag" --target "$GITHUB_SHA" dist/release/nider-text-* --title "Nider Text $tag" --prerelease \
             --notes-file notas.md
+      # Falhou: a etiqueta sem versão sai, para o Nider Terminal não ficar mostrando "Compilando".
+      - name: Tirar a etiqueta se a compilação falhou
+        if: failure() && github.event_name == 'workflow_dispatch' && github.event.inputs.versao != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${PUBLICAR#vv}"; tag="v${tag#v}"
+          gh release view "$tag" >/dev/null 2>&1 || git push origin ":refs/tags/$tag" || true
