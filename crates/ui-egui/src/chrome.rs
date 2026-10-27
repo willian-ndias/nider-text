@@ -284,6 +284,19 @@ fn brand_texture(ctx: &egui::Context, px: u32) -> Option<egui::TextureHandle> {
     Some(tex)
 }
 
+/// Paint the Nider Text icon into `rect`, snapped to the pixel grid so it stays crisp.
+pub(crate) fn paint_brand_icon(ctx: &egui::Context, painter: &egui::Painter, rect: Rect) {
+    let ppp = ctx.pixels_per_point();
+    let px = (rect.width().min(rect.height()) * ppp).round().clamp(8.0, 512.0);
+    let min = pos2((rect.min.x * ppp).round() / ppp, (rect.min.y * ppp).round() / ppp);
+    let snapped = Rect::from_min_size(min, vec2(px / ppp, px / ppp));
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let px_u = px as u32;
+    if let Some(tex) = brand_texture(ctx, px_u) {
+        painter.image(tex.id(), snapped, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
+    }
+}
+
 /// The brand at the start of the title bar and the Backstage: the icon, `size` points square and
 /// aligned to whole pixels, then NIDER TEXT ("TEXT" in the app's colour).
 pub fn brand(ui: &mut Ui, size: f32, ink: egui::Color32, accent: egui::Color32) {

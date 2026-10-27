@@ -82,6 +82,7 @@ pub mod table_resize;
 pub mod table_ruler;
 pub mod theme;
 pub mod widgets;
+pub mod nider_splash;
 pub mod window_close;
 pub mod window_controls;
 pub mod window_geometry;
@@ -628,6 +629,11 @@ pub struct WordApp {
     no_document: Option<u64>,
     /// Comment and reply text typed but not yet written to the document (#1348).
     pub(crate) comment_drafts: panes::CommentDrafts,
+    /// Nider: tela de abertura (logo, carregando, dados do criador), como no Etapas. O desktop
+    /// liga; testes e o canal de controle deixam `None`.
+    pub splash: Option<nider_splash::Splash>,
+    /// `file.open` adiado um frame para a splash aparecer antes da leitura do disco.
+    deferred_file_open: Option<serde_json::Value>,
 }
 
 /// The answer to "Do you want to save changes?" (`ui.saveChanges`).
@@ -726,6 +732,8 @@ impl WordApp {
             recovery_seen: false,
             no_document: None,
             comment_drafts: Default::default(),
+            splash: None,
+            deferred_file_open: None,
         }
     }
 
@@ -1159,6 +1167,18 @@ impl WordApp {
                 file_dialogs::Asked::Pending => Ok(json!({"pending": "saveAs"})),
                 file_dialogs::Asked::Busy => Ok(json!({"saved": false})),
             };
+        }
+        if id == "file.open"
+            && params.get("path").is_some()
+            && self.control_rx.is_none()
+            && self.ctx.is_some()
+            && self.deferred_file_open.is_none()
+        {
+            if self.splash.is_none() {
+                self.splash = Some(nider_splash::Splash::new());
+            }
+            self.deferred_file_open = Some(params);
+            return Ok(json!({"pending": "splashOpen"}));
         }
         let retry = (id == "file.open").then(|| params.clone());
         let r = self.execute(id, params);
@@ -1946,6 +1966,12 @@ impl WordApp {
 
     /// Per-frame logic before layout: control requests, screenshots, shortcuts, file drops.
     pub fn logic(&mut self, ctx: &egui::Context) {
+        if self.ctx.is_none() {
+            self.ctx = Some(ctx.clone());
+        }
+        if let Some(params) = self.deferred_file_open.take() {
+            let _ = self.execute("file.open", params);
+        }
         let lang = i18n::Lang::from_pref(&self.ui.language);
         i18n::set_current(lang);
         // New documents are written in the interface's language when WordCraft can proof it
@@ -2273,6 +2299,11 @@ impl WordApp {
             self.sent_title = title;
         }
         self.sync_full_screen(&ctx);
+        if let Some(splash) = &mut self.splash
+            && !splash.show(&ctx)
+        {
+            self.splash = None;
+        }
         self.frame_ms = now_ms() - t0;
         // Typing and formatting land here, after `logic` has reported.
         self.report_dirty();

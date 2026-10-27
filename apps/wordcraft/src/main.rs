@@ -31,36 +31,54 @@ use wordcraft_ui_egui::{
     window_geometry::{WindowGeometry, take_rescue},
 };
 
+/// Files from the command line, opened on the first frame while the Nider splash is visible.
+struct DeferredStartupOpens {
+    files: Vec<String>,
+    other_files: Vec<std::ffi::OsString>,
+}
+
 /// The app, the restored window geometry (or, with none, the default: no position) until the
 /// first frame that knows the monitor has checked it, the control server's key file (removed on
 /// exit), the file dialogs the app asked for and, on macOS, the documents opened from Finder.
-struct App(
-    WordApp,
-    Option<WindowGeometry>,
-    Option<control_server::KeyFile>,
-    file_dialogs::Launcher,
-    #[cfg(target_os = "macos")] fmv_macos_events::Inbox,
-);
+struct App {
+    word: WordApp,
+    window: Option<WindowGeometry>,
+    key_file: Option<control_server::KeyFile>,
+    dialogs: file_dialogs::Launcher,
+    #[cfg(target_os = "macos")]
+    apple_events: fmv_macos_events::Inbox,
+    deferred_startup: Option<DeferredStartupOpens>,
+}
 
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         #[cfg(target_os = "macos")]
-        apple_events::poll(&self.4, &mut self.0, ctx);
-        self.0.logic(ctx);
-        self.3.show(frame);
+        apple_events::poll(&self.apple_events, &mut self.word, ctx);
+        self.word.logic(ctx);
+        if let Some(opens) = self.deferred_startup.take() {
+            for f in opens.files {
+                if let Err(e) = self.word.execute("file.open", serde_json::json!({"path": f})) {
+                    log::warn!("{f}: {e}");
+                }
+            }
+            for f in opens.other_files {
+                open_non_unicode(&mut self.word, &f);
+            }
+        }
+        self.dialogs.show(frame);
         // A window that doesn't fit on its screen (the default size on a laptop) shrinks to fit
         // there, so all of the scroll bar can be dragged (#1215). Checked on the frame that first
         // knows the monitor: the off-screen check below takes the pending geometry then.
-        if let Some((pos, size)) = ctx.input(|i| self.1.and_then(|g| g.fit_on_monitor(i.viewport()))) {
+        if let Some((pos, size)) = ctx.input(|i| self.window.and_then(|g| g.fit_on_monitor(i.viewport()))) {
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
             ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(pos));
         }
-        let prev = self.0.ui.window;
-        self.0.ui.window = ctx.input(|i| WindowGeometry::track(prev, i.viewport(), i.viewport_rect().size()));
+        let prev = self.word.ui.window;
+        self.word.ui.window = ctx.input(|i| WindowGeometry::track(prev, i.viewport(), i.viewport_rect().size()));
         // The first frame, once the monitor is known (as `take_rescue` waits for): maximize a
         // window that opened at its normal size so it never flashed on screen half-opened.
-        let maximize = self.1.and_then(|g| g.maximize_after_open()).filter(|_| ctx.input(|i| i.viewport().monitor_size.is_some()));
-        if let Some(pos) = ctx.input(|i| take_rescue(&mut self.1, i.viewport())) {
+        let maximize = self.window.and_then(|g| g.maximize_after_open()).filter(|_| ctx.input(|i| i.viewport().monitor_size.is_some()));
+        if let Some(pos) = ctx.input(|i| take_rescue(&mut self.window, i.viewport())) {
             ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(pos));
         }
         if let Some(command) = maximize {
@@ -68,36 +86,36 @@ impl eframe::App for App {
         }
         // The window's close button: with unsaved changes, ask first (`WordApp::close_requested`).
         let closing = ctx.input(|i| i.viewport().close_requested());
-        if closing && !self.0.close_requested() {
+        if closing && !self.word.close_requested() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-        } else if (closing || self.0.quit_requested) && !self.0.printing.busy() {
+        } else if (closing || self.word.quit_requested) && !self.word.printing.busy() {
             // On macOS, letting eframe drop the window inside `-[NSApplication run]` aborts in
             // `-[_NSTouchBarFinderObservation invalidate]`. Command-Q calls `terminate:`. Once
             // the close is allowed, take that path instead of dropping the window on this turn.
             #[cfg(target_os = "macos")]
             {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                self.0.quit_requested = false;
-                schedule_macos_terminate(&self.0, self.2.as_ref());
+                self.word.quit_requested = false;
+                schedule_macos_terminate(&self.word, self.key_file.as_ref());
             }
             #[cfg(not(target_os = "macos"))]
-            if self.0.quit_requested {
+            if self.word.quit_requested {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
         }
     }
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
-        self.0.raw_input_hook(raw);
+        self.word.raw_input_hook(raw);
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
-        self.0.ui(ui);
+        self.word.ui(ui);
         nider_update::mostrar(ui.ctx());
-        self.3.show(frame);
+        self.dialogs.show(frame);
     }
     fn on_exit(&mut self) {
         print::finish_pending_jobs();
-        save_prefs(&self.0);
-        if let Some(key_file) = &self.2 {
+        save_prefs(&self.word);
+        if let Some(key_file) = &self.key_file {
             key_file.remove();
         }
     }
@@ -474,23 +492,30 @@ fn main() -> eframe::Result {
             if files.is_empty() && other_files.is_empty() && !sample && control_port.is_none() {
                 app.start_screen();
             }
-            for f in files {
-                if let Err(e) = app.run("file.open", serde_json::json!({"path": f})) {
-                    log::warn!("{f}: {e}");
+            let deferred_startup = if control_port.is_none() && prefs_enabled() {
+                app.splash = Some(wordcraft_ui_egui::nider_splash::Splash::new());
+                Some(DeferredStartupOpens { files, other_files })
+            } else {
+                for f in files {
+                    if let Err(e) = app.run("file.open", serde_json::json!({"path": f})) {
+                        log::warn!("{f}: {e}");
+                    }
                 }
-            }
-            for f in other_files {
-                open_non_unicode(&mut app, &f);
-            }
-            Ok(Box::new(App(
-                app,
+                for f in other_files {
+                    open_non_unicode(&mut app, &f);
+                }
+                None
+            };
+            Ok(Box::new(App {
+                word: app,
                 // With nothing restored, the window the system placed is checked all the same.
-                Some(restored.unwrap_or_default()),
+                window: Some(restored.unwrap_or_default()),
                 key_file,
                 dialogs,
                 #[cfg(target_os = "macos")]
-                apple_events.connect(&cc.egui_ctx),
-            )))
+                apple_events: apple_events.connect(&cc.egui_ctx),
+                deferred_startup,
+            }))
         }),
     )
 }
