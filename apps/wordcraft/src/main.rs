@@ -34,7 +34,7 @@ use wordcraft_ui_egui::{
 /// Files from the command line, opened on the first frame while the Nider splash is visible.
 struct DeferredStartupOpens {
     files: Vec<String>,
-    other_files: Vec<std::ffi::OsString>,
+    other_files: Vec<std::path::PathBuf>,
 }
 
 /// The app, the restored window geometry (or, with none, the default: no position) until the
