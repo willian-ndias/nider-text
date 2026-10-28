@@ -2668,41 +2668,16 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             }
             ok || cancel
         }
-        Dialog::About { tab } => {
-            ui.set_width(660.0);
-            ui.horizontal(|ui| {
-                for (i, l) in ["About", "Contributors", "Models"].into_iter().enumerate() {
-                    let i = i as u8;
-                    if ui.selectable_label(*tab == i, tl!(l)).clicked() {
-                        *tab = i;
-                    }
-                }
-            });
-            ui.separator();
-            match *tab {
-                1 => crate::credits::contributors_ui(ui),
-                2 => crate::credits::models_ui(ui),
-                _ => {
-                    ui.label(egui::RichText::new("Nider Text").font(semibold(22.0)));
-                    let build = option_env!("WORDCRAFT_BUILD_SHA").map(|s| s.get(..8).unwrap_or(s)).unwrap_or(tl!("development build"));
-                    ui.label(crate::i18n::fmt(tl!("Version {version} ({build})"), &[("version", env!("CARGO_PKG_VERSION")), ("build", build)]));
-                    ui.label("by nider.com.br");
-                    ui.label("Willian Dias  ·  nider@nider.com.br");
-                    ui.add_space(6.0);
-                    ui.label("Editor de texto e diagramação de livros.
-Baseado no WordCraft, de Brandon Thomas e da equipe ArtCraft.");
-                    ui.add_space(6.0);
-                    ui.hyperlink_to("nider.com.br", "https://nider.com.br");
-                    ui.hyperlink_to("Código-fonte do Nider Text: github.com/willian-ndias/nider-text", "https://github.com/willian-ndias/nider-text");
-                    ui.hyperlink_to("Projeto original: github.com/storytold/wordcraft", "https://github.com/storytold/wordcraft");
-                    ui.add_space(6.0);
-                    ui.label(
-                        egui::RichText::new("MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team e colaboradores do WordCraft. Modificado por Nider.")
-                            .small()
-                            .weak(),
-                    );
-                }
-            }
+        Dialog::About { .. } => {
+            ui.set_width(420.0);
+            ui.label(egui::RichText::new("Nider Text").font(semibold(22.0)));
+            ui.label(format!("Versão {}", env!("CARGO_PKG_VERSION")));
+            ui.label("Editor de texto e diagramação de livros.");
+            ui.add_space(10.0);
+            ui.label(egui::RichText::new("Nider Company").strong());
+            ui.label("Willian Dias");
+            ui.hyperlink_to("nider.com.br", "https://nider.com.br");
+            ui.hyperlink_to("nider@nider.com.br", "mailto:nider@nider.com.br");
             let (ok, cancel) = buttons(ui, tl!("Close"));
             ok || cancel
         }
