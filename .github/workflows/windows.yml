@@ -27,7 +27,7 @@ jobs:
       CARGO_INCREMENTAL: 0
       WORDCRAFT_BUILD_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # O Nider Terminal mostra "Compilando a versão …" enquanto existe a etiqueta sem instalador:
@@ -43,7 +43,7 @@ jobs:
             git push origin "refs/tags/$tag"
           fi
       - name: Fontes do WordCraft (craft-fonts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: storytold/craft-fonts
           ref: 8dcdacd5153e64560d109541a47d806f26f048c0
@@ -69,7 +69,7 @@ jobs:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
           CRAFT_FONTS_REQUIRED: "1"
         run: ./packaging/windows/package.ps1 -Arch x64
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
       - name: Instalador personalizado (NiderTextSetup.exe)
@@ -90,7 +90,7 @@ jobs:
             Rename-Item $_.FullName ($_.Name -replace '^wordcraft-', 'nider-text-')
           }
           Get-ChildItem dist/release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: nider-text-windows-x64
           path: dist/release/*
